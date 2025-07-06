@@ -1,0 +1,104 @@
+metadata:
+  name: "customer-support-platform"
+  team: "customer-experience"
+  environment: "{{ .Environment }}"  # Dynamically set by GitHub Actions
+
+terraform:
+  backend:
+    type: "s3"
+    bucket: "{{ .TFStateBucket }}"
+    key: "{{ .TFStateKeyPrefix }}/{{ .Environment }}/terraform.tfstate"
+    region: "{{ .AWSRegion }}"
+    dynamodb_table: "{{ .TFStateLockTable }}"
+    encrypt: true
+  
+  # Variables passed to Terraform
+  variables:
+    project_name: "{{ .ProjectName }}"
+    environment: "{{ .Environment }}"
+    aws_region: "{{ .AWSRegion }}"
+    team: "{{ .Team }}"
+
+scanning:
+  paths: ["./agents", "./lambdas", "./action-groups", "./knowledge-bases", "./guardrails", "./prompts"]
+  include: ["*.yml", "*.yaml"]
+  exclude: ["**/node_modules/**", "**/.git/**", "**/terraform/**", "**/.terraform/**"]
+
+modules:
+  registry: "git::https://github.com/company/bedrock-terraform-modules"
+  version: "v1.2.0"
+
+# Environment-specific overrides
+environments:
+  dev:
+    modules:
+      version: "v1.2.0-dev"
+    variables:
+      log_level: "DEBUG"
+      retain_logs: false
+  
+  staging:
+    modules:
+      version: "v1.2.0-rc"
+    variables:
+      log_level: "INFO"
+      retain_logs: true
+  
+  prod:
+    modules:
+      version: "v1.2.0"
+    variables:
+      log_level: "WARN"
+      retain_logs: true
+      enable_monitoring: true
+
+# S3 configuration for Lambda packages and schemas
+s3:
+  bucket: "{{ .ArtifactsBucket }}"
+  key_prefix: "bedrock-forge/{{ .Environment }}"
+  
+# Lambda packaging configuration
+lambda:
+  packaging:
+    exclude_patterns:
+      - "*.yml"
+      - "*.yaml"
+      - ".git/**"
+      - "node_modules/**"
+      - "__pycache__/**"
+      - "*.pyc"
+      - ".pytest_cache/**"
+      - "tests/**"
+      - "test_*.py"
+    
+    python:
+      runtime: "python3.11"
+      install_requirements: true
+      requirements_file: "requirements.txt"
+    
+    nodejs:
+      runtime: "nodejs18.x"
+      install_dependencies: true
+      package_file: "package.json"
+
+# Schema management configuration
+schemas:
+  discovery:
+    file_patterns:
+      - "openapi.json"
+      - "openapi.yaml"
+      - "openapi.yml"
+      - "schema.json"
+      - "schema.yaml"
+      - "schema.yml"
+      - "api.json"
+      - "api.yaml"
+      - "api.yml"
+  
+  validation:
+    enabled: true
+    bedrock_compatibility: true
+    
+  upload:
+    content_type: "application/json"
+    versioning: true

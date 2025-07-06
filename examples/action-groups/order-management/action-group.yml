@@ -1,0 +1,22 @@
+kind: ActionGroup
+metadata:
+  name: "order-management"
+  description: "Action group for order management operations"
+spec:
+  description: "Provides order lookup and management capabilities"
+  actionGroupExecutor:
+    lambda: "order-lookup"  # References the Lambda function
+  apiSchema:
+    s3:
+      s3BucketName: "bedrock-schemas"
+      s3ObjectKey: "action-groups/order-management/openapi.json"
+  # Alternatively, use function schema for simple cases
+  functionSchema:
+    functions:
+      - name: "lookup_order"
+        description: "Look up order details by order ID"
+        parameters:
+          order_id:
+            description: "The unique order identifier"
+            required: true
+            type: "string"

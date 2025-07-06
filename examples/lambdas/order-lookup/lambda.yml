@@ -1,0 +1,17 @@
+kind: Lambda
+metadata:
+  name: "order-lookup"
+  description: "Lambda function to look up customer orders"
+spec:
+  runtime: "python3.9"
+  handler: "app.handler"
+  code:
+    source: "directory"  # Code is in the same directory as this YAML file
+  environment:
+    ORDER_API_URL: "https://api.company.com/orders"
+    LOG_LEVEL: "INFO"
+  timeout: 30
+  memorySize: 256
+  tags:
+    Function: "OrderLookup"
+    Team: "CustomerSupport"

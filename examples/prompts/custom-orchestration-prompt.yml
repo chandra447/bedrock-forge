@@ -1,0 +1,50 @@
+kind: Prompt
+metadata:
+  name: "custom-orchestration-prompt"
+  description: "Custom orchestration prompt for customer support"
+spec:
+  description: "Custom orchestration prompt for customer support"
+  defaultVariant: "production"
+  
+  variants:
+    - name: "production"
+      modelId: "anthropic.claude-3-sonnet-20240229-v1:0"
+      templateType: "TEXT"
+      templateConfiguration:
+        text: |
+          You are a customer support agent. Always be helpful and professional.
+          
+          Instructions:
+          1. Greet the customer warmly
+          2. Listen to their concern
+          3. Provide accurate information
+          4. Offer additional assistance
+          
+          Customer Query: {{query}}
+          
+          Context: {{context}}
+      
+      inferenceConfiguration:
+        text:
+          temperature: 0.1
+          topP: 0.9
+          maxTokens: 2048
+          stopSequences: ["Human:", "Assistant:"]
+    
+    - name: "development"
+      modelId: "anthropic.claude-3-sonnet-20240229-v1:0"
+      templateType: "TEXT"
+      templateConfiguration:
+        text: |
+          [DEBUG MODE] Customer Support Agent
+          
+          Query: {{query}}
+          Context: {{context}}
+          
+          Debug info will be included in responses.
+      
+      inferenceConfiguration:
+        text:
+          temperature: 0.2
+          topP: 0.95
+          maxTokens: 1024

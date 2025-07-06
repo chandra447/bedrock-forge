@@ -1,0 +1,75 @@
+# Example 1: Agent with auto-created IAM role (default behavior)
+kind: Agent
+metadata:
+  name: "customer-support-auto"
+  description: "Customer support agent with auto-created IAM role"
+spec:
+  foundationModel: "anthropic.claude-3-sonnet-20240229-v1:0"
+  instruction: "You are a helpful customer support agent..."
+  description: "Customer support agent for order management"
+  idleSessionTtlInSeconds: 3600
+  
+  # Auto-create IAM role with basic permissions (default)
+  iamRole:
+    autoCreate: true
+    additionalPolicies:
+      - policyArn: "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
+
+  guardrail:
+    name: "content-safety-guardrail"
+    version: "1"
+    mode: "pre"
+  
+  knowledgeBases: 
+    - name: "faq-kb"
+      description: "Customer FAQ knowledge base"
+
+---
+# Example 2: Agent with manually defined IAM role
+kind: Agent
+metadata:
+  name: "customer-support-custom"
+  description: "Customer support agent with custom IAM role"
+spec:
+  foundationModel: "anthropic.claude-3-sonnet-20240229-v1:0"
+  instruction: "You are a helpful customer support agent..."
+  description: "Customer support agent for order management"
+  idleSessionTtlInSeconds: 3600
+  
+  # Reference to manually defined IAM role
+  iamRole:
+    roleName: "custom-agent-execution-role"
+
+  guardrail:
+    name: "content-safety-guardrail"
+    version: "1"
+    mode: "pre"
+  
+  knowledgeBases: 
+    - name: "faq-kb"
+      description: "Customer FAQ knowledge base"
+
+---
+# Example 3: Agent with existing IAM role ARN
+kind: Agent
+metadata:
+  name: "customer-support-existing"
+  description: "Customer support agent with existing IAM role"
+spec:
+  foundationModel: "anthropic.claude-3-sonnet-20240229-v1:0"
+  instruction: "You are a helpful customer support agent..."
+  description: "Customer support agent for order management"
+  idleSessionTtlInSeconds: 3600
+  
+  # Use existing IAM role ARN
+  iamRole:
+    roleArn: "arn:aws:iam::123456789012:role/ExistingBedrockAgentRole"
+
+  guardrail:
+    name: "content-safety-guardrail"
+    version: "1"
+    mode: "pre"
+  
+  knowledgeBases: 
+    - name: "faq-kb"
+      description: "Customer FAQ knowledge base"

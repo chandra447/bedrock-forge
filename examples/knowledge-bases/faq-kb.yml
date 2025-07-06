@@ -1,0 +1,52 @@
+kind: KnowledgeBase
+metadata:
+  name: "faq-kb"
+  description: "Customer FAQ knowledge base"
+spec:
+  description: "Customer FAQ knowledge base"
+  
+  knowledgeBaseConfiguration:
+    type: "VECTOR"
+    vectorKnowledgeBaseConfiguration:
+      embeddingModelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v1"
+      embeddingModelConfiguration:
+        bedrockEmbeddingModelConfiguration:
+          dimensions: 1536
+  
+  storageConfiguration:
+    type: "OPENSEARCH_SERVERLESS"
+    opensearchServerlessConfiguration:
+      collectionArn: "arn:aws:aoss:us-east-1:123456789012:collection/bedrock-kb"
+      vectorIndexName: "bedrock-knowledge-base-index"
+      fieldMapping:
+        vectorField: "vector"
+        textField: "text"
+        metadataField: "metadata"
+  
+  dataSources:
+    - name: "faq-documents"
+      type: "S3"
+      s3Configuration:
+        bucketArn: "arn:aws:s3:::company-kb-documents"
+        inclusionPrefixes: ["faq/"]
+      
+      chunkingConfiguration:
+        chunkingStrategy: "FIXED_SIZE"
+        fixedSizeChunkingConfiguration:
+          maxTokens: 512
+          overlapPercentage: 20
+      
+      vectorIngestionConfiguration:
+        chunkingConfiguration:
+          chunkingStrategy: "SEMANTIC"
+          semanticChunkingConfiguration:
+            maxTokens: 300
+            bufferSize: 1
+            breakpointPercentileThreshold: 95
+      
+      customTransformation:
+        transformationLambda:
+          lambdaArn: "arn:aws:lambda:us-east-1:123456789012:function:kb-preprocessor"
+        intermediateStorage:
+          s3Location:
+            uri: "s3://company-kb-temp/transformations/"

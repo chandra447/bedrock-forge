@@ -1,0 +1,69 @@
+kind: IAMRole
+metadata:
+  name: "custom-agent-execution-role"
+  description: "Custom IAM role for Bedrock agent with specific permissions"
+spec:
+  description: "Custom execution role for Bedrock agents with Lambda invoke permissions"
+  
+  # Trust policy allowing Bedrock service to assume this role
+  assumeRolePolicy:
+    version: "2012-10-17"
+    statement:
+      - effect: "Allow"
+        principal:
+          service: "bedrock.amazonaws.com"
+        action: "sts:AssumeRole"
+  
+  # Managed AWS policies
+  policies:
+    - policyArn: "arn:aws:iam::aws:policy/service-role/AmazonBedrockAgentResourcePolicy"
+    - policyArn: "arn:aws:iam::aws:policy/CloudWatchLogsFullAccess"
+  
+  # Custom inline policies
+  inlinePolicies:
+    - name: "BedrockFoundationModelAccess"
+      policy:
+        version: "2012-10-17"
+        statement:
+          - sid: "InvokeFoundationModels"
+            effect: "Allow"
+            action:
+              - "bedrock:InvokeModel"
+              - "bedrock:InvokeModelWithResponseStream"
+            resource: "arn:aws:bedrock:*::foundation-model/*"
+          
+          - sid: "RetrieveAndGenerate"
+            effect: "Allow"
+            action:
+              - "bedrock:Retrieve"
+              - "bedrock:RetrieveAndGenerate"
+            resource: 
+              - "arn:aws:bedrock:*:*:knowledge-base/*"
+              - "arn:aws:bedrock:*:*:data-source/*"
+    
+    - name: "LambdaInvokePermissions"
+      policy:
+        version: "2012-10-17"
+        statement:
+          - sid: "InvokeLambdaFunctions"
+            effect: "Allow"
+            action: "lambda:InvokeFunction"
+            resource: "arn:aws:lambda:*:*:function:bedrock-action-*"
+    
+    - name: "S3DataSourceAccess"
+      policy:
+        version: "2012-10-17"
+        statement:
+          - sid: "ReadKnowledgeBaseData"
+            effect: "Allow"
+            action:
+              - "s3:GetObject"
+              - "s3:ListBucket"
+            resource:
+              - "arn:aws:s3:::company-kb-documents/*"
+              - "arn:aws:s3:::company-kb-documents"
+  
+  tags:
+    Purpose: "BedrockAgentExecution"
+    CreatedBy: "bedrock-forge"
+    Environment: "production"

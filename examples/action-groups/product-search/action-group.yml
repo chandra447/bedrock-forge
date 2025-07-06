@@ -1,0 +1,12 @@
+kind: ActionGroup
+metadata:
+  name: "product-search"
+  description: "Action group for product search operations"
+spec:
+  description: "Provides product search and filtering capabilities"
+  actionGroupExecutor:
+    lambda: "product-search-api"
+  apiSchema:
+    s3:
+      s3BucketName: "bedrock-schemas"
+      s3ObjectKey: "action-groups/product-search/openapi.json"

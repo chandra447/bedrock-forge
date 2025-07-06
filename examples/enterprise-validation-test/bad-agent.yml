@@ -1,0 +1,18 @@
+# Example agent that violates enterprise standards - should fail validation
+kind: Agent
+metadata:
+  name: "bad-agent"  # Violates naming convention (no team-env prefix)
+  description: "Poorly configured agent for testing validation"
+spec:
+  foundationModel: "anthropic.claude-instant-v1"  # Forbidden model in enterprise config
+  instruction: "You are an agent"
+  idleSessionTtlInSeconds: 7200  # Exceeds max allowed (1800)
+  # Missing customerEncryptionKey (required in enterprise)
+  # Missing guardrail (required in enterprise)
+  # Missing memoryConfiguration (required in enterprise)
+  
+  tags:
+    # Missing required tags: Environment, Project, Owner, CostCenter, Team, 
+    # BusinessUnit, DataClassification, ComplianceLevel, AgentType, 
+    # BusinessFunction, DataProcessing, SecurityLevel
+    SomeCustomTag: "value"

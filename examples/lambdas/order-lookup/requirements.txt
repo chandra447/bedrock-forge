@@ -1,0 +1,5 @@
+# No external dependencies for this simple example
+# In a real Lambda, you might have:
+# requests==2.31.0
+# boto3==1.28.0
+# pydantic==2.0.0

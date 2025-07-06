@@ -1,0 +1,17 @@
+kind: Lambda
+metadata:
+  name: "product-search-api"
+  description: "FastAPI-based product search service"
+spec:
+  runtime: "python3.9"
+  handler: "app.handler"
+  code:
+    source: "directory"
+  environment:
+    PRODUCT_DB_URL: "https://api.company.com/products"
+    LOG_LEVEL: "INFO"
+  timeout: 30
+  memorySize: 512
+  tags:
+    Function: "ProductSearch"
+    Framework: "FastAPI"

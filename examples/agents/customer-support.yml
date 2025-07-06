@@ -1,0 +1,88 @@
+kind: Agent
+metadata:
+  name: "customer-support"
+  description: "Customer support agent for order management"
+spec:
+  foundationModel: "anthropic.claude-3-sonnet-20240229-v1:0"
+  instruction: "You are a helpful customer support agent..."
+  description: "Customer support agent for order management"
+  idleSessionTtlInSeconds: 3600
+  
+  guardrail:
+    name: "content-safety-guardrail"
+    version: "1"
+    mode: "pre"
+  
+  knowledgeBases: 
+    - name: "faq-kb"
+      description: "Customer FAQ knowledge base"
+  
+  promptOverrides:
+    - promptType: "PRE_PROCESSING"
+      promptArn: "arn:aws:bedrock:us-east-1:123456789012:prompt/custom-preprocessing"
+      promptVariant: "v1"
+    - promptType: "ORCHESTRATION"
+      prompt: "custom-orchestration-prompt"
+      variant: "production"
+  
+  memoryConfiguration:
+    enabledMemoryTypes: ["SESSION_SUMMARY"]
+    storageDays: 30
+
+---
+kind: Guardrail
+metadata:
+  name: "content-safety-guardrail"
+  description: "Enterprise content safety guardrail"
+spec:
+  description: "Enterprise content safety guardrail"
+  
+  contentPolicyConfig:
+    filtersConfig:
+      - type: "SEXUAL"
+        inputStrength: "HIGH"
+        outputStrength: "HIGH"
+      - type: "VIOLENCE"
+        inputStrength: "MEDIUM"
+        outputStrength: "HIGH"
+      - type: "HATE"
+        inputStrength: "HIGH"
+        outputStrength: "HIGH"
+      - type: "INSULTS"
+        inputStrength: "MEDIUM"
+        outputStrength: "HIGH"
+      - type: "MISCONDUCT"
+        inputStrength: "MEDIUM"
+        outputStrength: "MEDIUM"
+      - type: "PROMPT_ATTACK"
+        inputStrength: "HIGH"
+        outputStrength: "NONE"
+  
+  sensitiveInformationPolicyConfig:
+    piiEntitiesConfig:
+      - type: "EMAIL"
+        action: "BLOCK"
+      - type: "PHONE"
+        action: "ANONYMIZE"
+      - type: "SSN"
+        action: "BLOCK"
+  
+  contextualGroundingPolicyConfig:
+    filtersConfig:
+      - type: "GROUNDING"
+        threshold: 0.8
+      - type: "RELEVANCE" 
+        threshold: 0.7
+  
+  topicPolicyConfig:
+    topicsConfig:
+      - name: "Investment Advice"
+        definition: "Discussions about financial investments or trading advice"
+        examples: ["Should I buy this stock?", "What's the best crypto to invest in?"]
+        type: "DENY"
+  
+  wordPolicyConfig:
+    wordsConfig:
+      - text: "competitor_name"
+    managedWordListsConfig:
+      - type: "PROFANITY"

@@ -1,0 +1,135 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Shared Inventory Management API",
+    "description": "API for accessing shared inventory management functions",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/inventory/check": {
+      "post": {
+        "summary": "Check inventory levels",
+        "description": "Check current inventory levels for a specific product",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["product_id"],
+                "properties": {
+                  "product_id": {
+                    "type": "string",
+                    "description": "The unique product identifier"
+                  },
+                  "warehouse_id": {
+                    "type": "string",
+                    "description": "The warehouse identifier (optional)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Inventory levels retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "product_id": {
+                      "type": "string"
+                    },
+                    "available_quantity": {
+                      "type": "integer"
+                    },
+                    "warehouse_id": {
+                      "type": "string"
+                    },
+                    "last_updated": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Product not found"
+          }
+        }
+      }
+    },
+    "/inventory/reserve": {
+      "post": {
+        "summary": "Reserve inventory",
+        "description": "Reserve inventory for an order",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["product_id", "quantity", "order_id"],
+                "properties": {
+                  "product_id": {
+                    "type": "string",
+                    "description": "The unique product identifier"
+                  },
+                  "quantity": {
+                    "type": "integer",
+                    "description": "Quantity to reserve",
+                    "minimum": 1
+                  },
+                  "order_id": {
+                    "type": "string",
+                    "description": "The order identifier"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Inventory reserved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "reservation_id": {
+                      "type": "string"
+                    },
+                    "product_id": {
+                      "type": "string"
+                    },
+                    "reserved_quantity": {
+                      "type": "integer"
+                    },
+                    "order_id": {
+                      "type": "string"
+                    },
+                    "expires_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Insufficient inventory or invalid request"
+          },
+          "404": {
+            "description": "Product not found"
+          }
+        }
+      }
+    }
+  }
+}

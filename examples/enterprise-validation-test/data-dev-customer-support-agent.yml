@@ -1,0 +1,37 @@
+# Example agent that complies with enterprise naming and tagging standards
+kind: Agent
+metadata:
+  name: "data-dev-customer-support-agent"
+  description: "Customer support agent for data team development environment"
+spec:
+  foundationModel: "anthropic.claude-3-sonnet-20240229-v1:0"
+  instruction: "You are a helpful customer support agent"
+  idleSessionTtlInSeconds: 1800
+  customerEncryptionKey: "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+  
+  tags:
+    Environment: "dev"
+    Project: "customer-support-platform"
+    Owner: "john.doe@company.com"
+    CostCenter: "CC-123456"
+    Team: "data"
+    BusinessUnit: "engineering"
+    DataClassification: "internal"
+    ComplianceLevel: "none"
+    AgentType: "conversational"
+    BusinessFunction: "customer-service"
+    DataProcessing: "conversational-ai"
+    SecurityLevel: "medium"
+  
+  guardrail:
+    name: "data-dev-content-safety-guardrail"
+    version: "1"
+  
+  memoryConfiguration:
+    enabledMemoryTypes: ["SESSION_SUMMARY"]
+    storageDays: 30
+  
+  iamRole:
+    autoCreate: true
+    additionalPolicies:
+      - policyArn: "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"

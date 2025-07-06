@@ -1,0 +1,208 @@
+# Enterprise Validation Configuration for Bedrock Forge
+# This configuration enforces strict enterprise standards for resource naming,
+# tagging, and security compliance.
+
+enabledValidators:
+  - naming
+  - tagging
+  - security
+
+namingConventions:
+  global:
+    minLength: 5
+    maxLength: 50
+    allowedChars: "a-z0-9-"
+    forceLowercase: true
+    pattern: "^[a-z][a-z0-9-]*[a-z0-9]$"
+    validationMessage: "Resource names must be lowercase with hyphens, start with letter, end with letter or number"
+
+  resources:
+    Agent:
+      pattern: "^[a-z]+-(dev|staging|prod)-[a-z0-9-]+-agent$"
+      validationMessage: "Agent names must follow pattern: <team>-<env>-<name>-agent"
+    
+    Lambda:
+      pattern: "^[a-z]+-(dev|staging|prod)-[a-z0-9-]+-lambda$"
+      validationMessage: "Lambda names must follow pattern: <team>-<env>-<name>-lambda"
+    
+    ActionGroup:
+      pattern: "^[a-z]+-(dev|staging|prod)-[a-z0-9-]+-action-group$"
+      validationMessage: "ActionGroup names must follow pattern: <team>-<env>-<name>-action-group"
+    
+    KnowledgeBase:
+      pattern: "^[a-z]+-(dev|staging|prod)-[a-z0-9-]+-kb$"
+      validationMessage: "KnowledgeBase names must follow pattern: <team>-<env>-<name>-kb"
+    
+    Guardrail:
+      pattern: "^[a-z]+-(dev|staging|prod)-[a-z0-9-]+-guardrail$"
+      validationMessage: "Guardrail names must follow pattern: <team>-<env>-<name>-guardrail"
+    
+    Prompt:
+      pattern: "^[a-z]+-(dev|staging|prod)-[a-z0-9-]+-prompt$"
+      validationMessage: "Prompt names must follow pattern: <team>-<env>-<name>-prompt"
+    
+    IAMRole:
+      pattern: "^[a-z]+-(dev|staging|prod)-[a-z0-9-]+-role$"
+      validationMessage: "IAMRole names must follow pattern: <team>-<env>-<name>-role"
+
+taggingPolicies:
+  global:
+    requiredTags:
+      - Environment
+      - Project
+      - Owner
+      - CostCenter
+      - Team
+      - BusinessUnit
+      - DataClassification
+      - ComplianceLevel
+    optionalTags:
+      - BackupRequired
+      - MonitoringLevel
+      - SLA
+    validationMessage: "All resources must have required enterprise tags for compliance and cost tracking"
+
+  resources:
+    Agent:
+      requiredTags:
+        - AgentType
+        - BusinessFunction
+        - DataProcessing
+        - SecurityLevel
+      validationMessage: "Bedrock agents require comprehensive tagging for compliance and audit"
+    
+    Lambda:
+      requiredTags:
+        - Runtime
+        - FunctionType
+        - ExecutionRole
+        - SecurityLevel
+      validationMessage: "Lambda functions require comprehensive tagging for security and governance"
+    
+    KnowledgeBase:
+      requiredTags:
+        - DataSource
+        - ContentType
+        - DataSensitivity
+        - RetentionPeriod
+      validationMessage: "Knowledge bases require data governance tags for compliance"
+    
+    IAMRole:
+      requiredTags:
+        - RoleType
+        - AccessLevel
+        - AuditRequired
+      validationMessage: "IAM roles require security and audit tags"
+
+  tagValidation:
+    Environment:
+      allowedValues: ["dev", "staging", "prod"]
+      caseSensitive: false
+      validationMessage: "Environment must be one of: dev, staging, prod"
+    
+    Owner:
+      pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+      validationMessage: "Owner must be a valid corporate email address"
+    
+    CostCenter:
+      pattern: "^CC-\\d{6}$"
+      validationMessage: "CostCenter must follow corporate format: CC-XXXXXX"
+    
+    Team:
+      allowedValues:
+        - engineering
+        - data
+        - security
+        - operations
+        - product
+        - compliance
+        - finance
+        - legal
+      caseSensitive: false
+      validationMessage: "Team must be a recognized organizational team"
+    
+    DataClassification:
+      allowedValues: ["public", "internal", "confidential", "restricted"]
+      caseSensitive: false
+      validationMessage: "DataClassification must follow corporate data classification standards"
+    
+    ComplianceLevel:
+      allowedValues: ["none", "pci", "hipaa", "sox", "gdpr"]
+      caseSensitive: false
+      validationMessage: "ComplianceLevel must specify applicable compliance frameworks"
+    
+    SecurityLevel:
+      allowedValues: ["low", "medium", "high", "critical"]
+      caseSensitive: false
+      validationMessage: "SecurityLevel must be low, medium, high, or critical"
+
+securityPolicies:
+  iamPolicies:
+    forbiddenActions:
+      - "iam:CreateAccessKey"
+      - "iam:DeleteAccessKey"
+      - "iam:CreateUser"
+      - "iam:DeleteUser"
+      - "sts:AssumeRole.*Root"
+      - ".*:.*Admin.*"
+      - ".*:.*Full.*"
+    allowWildcardResources: false
+    allowAdminPermissions: false
+    requireMFAForSensitiveActions: true
+    sensitiveActions:
+      - "iam:.*"
+      - "sts:AssumeRole"
+      - "kms:.*"
+      - "secretsmanager:.*"
+      - "bedrock:.*Agent.*"
+
+  lambdaSecurity:
+    requireVPC: true
+    forbiddenEnvPatterns:
+      - "(?i)(password|secret|key|token|api_key|auth)"
+      - "(?i)(prod|production).*(?i)(pass|secret)"
+    maxTimeout: 300  # 5 minutes
+    maxMemorySize: 1024
+    requireEnvEncryption: true
+    allowedRuntimes:
+      - "python3.11"
+      - "python3.10"
+      - "nodejs18.x"
+      - "java17"
+
+  agentSecurity:
+    requireGuardrails: true
+    requiredGuardrailTypes:
+      - "CONTENT"
+      - "SENSITIVE_INFORMATION"
+    maxIdleSessionTTL: 1800  # 30 minutes
+    requireCustomerEncryption: true
+    requireMemoryConfiguration: true
+    forbiddenModels:
+      - "anthropic.claude-instant"
+      - "meta.llama2"
+
+  knowledgeBaseSecurity:
+    requireDataSourceEncryption: true
+    allowedDataSourceTypes:
+      - "S3"
+    requireVPCEndpoints: true
+    maxRetentionDays: 2555  # 7 years
+    requireAccessLogging: true
+
+  encryptionRequirements:
+    requireEncryptionAtRest: true
+    requireEncryptionInTransit: true
+    requireCustomerManagedKeys: true
+    allowedKMSKeyPatterns:
+      - "arn:aws:kms:.*:.*:key/.*"
+
+  networkSecurity:
+    requirePrivateSubnets: true
+    requireVPCFlowLogs: true
+    forbiddenPorts:
+      - "22"    # SSH
+      - "3389"  # RDP
+      - "1433"  # SQL Server
+      - "3306"  # MySQL
+      - "5432"  # PostgreSQL

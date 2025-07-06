@@ -1,0 +1,22 @@
+# Example: Custom S3 bucket module for storing Lambda code and API schemas
+kind: CustomModule
+metadata:
+  name: bedrock-s3-bucket
+  description: S3 bucket for storing Bedrock agent artifacts
+spec:
+  # Local module in modules/ directory
+  source: "./modules/s3-bucket"
+  
+  variables:
+    bucket_name: "bedrock-agent-artifacts-${var.environment}"
+    versioning_enabled: true
+    lifecycle_rules:
+      - id: "delete_old_versions"
+        enabled: true
+        noncurrent_version_expiration_days: 30
+    tags:
+      Purpose: "BedrockAgentArtifacts"
+      Environment: "${var.environment}"
+      ManagedBy: "bedrock-forge"
+  
+  description: "S3 bucket for storing Lambda code packages and OpenAPI schemas"

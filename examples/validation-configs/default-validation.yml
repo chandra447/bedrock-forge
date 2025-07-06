@@ -1,0 +1,51 @@
+# Default Validation Configuration for Bedrock Forge
+# This configuration provides sensible defaults for resource validation
+# while being flexible enough for development environments.
+
+enabledValidators:
+  - naming
+  - tagging
+
+namingConventions:
+  global:
+    minLength: 3
+    maxLength: 64
+    allowedChars: "a-zA-Z0-9-_"
+    forbiddenChars: " "
+    pattern: "^[a-zA-Z][a-zA-Z0-9-_]*$"
+
+  resources:
+    Agent:
+      suffix: "-agent"
+      pattern: "^[a-z][a-z0-9-]*-agent$"
+    
+    Lambda:
+      suffix: "-lambda"
+      pattern: "^[a-z][a-z0-9-]*-lambda$"
+    
+    ActionGroup:
+      suffix: "-action-group"
+      pattern: "^[a-z][a-z0-9-]*-action-group$"
+    
+    KnowledgeBase:
+      suffix: "-kb"
+      pattern: "^[a-z][a-z0-9-]*-kb$"
+
+taggingPolicies:
+  global:
+    requiredTags:
+      - Environment
+      - Project
+      - Owner
+    optionalTags:
+      - CostCenter
+      - Team
+
+  tagValidation:
+    Environment:
+      allowedValues: ["dev", "staging", "prod", "test"]
+      caseSensitive: false
+    
+    Owner:
+      pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+      validationMessage: "Owner must be a valid email address"

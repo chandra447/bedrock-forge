@@ -1,0 +1,65 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Order Management API",
+    "version": "1.0.0",
+    "description": "API for managing customer orders"
+  },
+  "paths": {
+    "/lookup_order": {
+      "post": {
+        "summary": "Look up order details",
+        "description": "Retrieve order information by order ID",
+        "operationId": "lookup_order",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "order_id": {
+                    "type": "string",
+                    "description": "The unique order identifier"
+                  }
+                },
+                "required": ["order_id"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Order details retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "order": {
+                      "type": "object",
+                      "properties": {
+                        "order_id": {"type": "string"},
+                        "customer_name": {"type": "string"},
+                        "status": {"type": "string"},
+                        "total": {"type": "number"},
+                        "tracking_number": {"type": "string"}
+                      }
+                    },
+                    "message": {"type": "string"}
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing order_id"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    }
+  }
+}

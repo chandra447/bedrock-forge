@@ -1,0 +1,61 @@
+# Copy of enterprise validation configuration for testing
+enabledValidators:
+  - naming
+  - tagging
+  - security
+
+namingConventions:
+  global:
+    minLength: 5
+    maxLength: 50
+    allowedChars: "a-z0-9-"
+    forceLowercase: true
+    pattern: "^[a-z][a-z0-9-]*[a-z0-9]$"
+
+  resources:
+    Agent:
+      pattern: "^[a-z]+-(dev|staging|prod)-[a-z0-9-]+-agent$"
+      validationMessage: "Agent names must follow pattern: <team>-<env>-<name>-agent"
+
+taggingPolicies:
+  global:
+    requiredTags:
+      - Environment
+      - Project
+      - Owner
+      - CostCenter
+      - Team
+      - BusinessUnit
+      - DataClassification
+      - ComplianceLevel
+
+  resources:
+    Agent:
+      requiredTags:
+        - AgentType
+        - BusinessFunction
+        - DataProcessing
+        - SecurityLevel
+
+  tagValidation:
+    Environment:
+      allowedValues: ["dev", "staging", "prod"]
+      caseSensitive: false
+    Team:
+      allowedValues: ["engineering", "data", "security", "operations"]
+      caseSensitive: false
+    DataClassification:
+      allowedValues: ["public", "internal", "confidential", "restricted"]
+      caseSensitive: false
+    SecurityLevel:
+      allowedValues: ["low", "medium", "high", "critical"]
+      caseSensitive: false
+
+securityPolicies:
+  agentSecurity:
+    requireGuardrails: true
+    maxIdleSessionTTL: 1800
+    requireCustomerEncryption: true
+    requireMemoryConfiguration: true
+    forbiddenModels:
+      - "anthropic.claude-instant"
