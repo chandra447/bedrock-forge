@@ -210,6 +210,7 @@ func (r *ResourceRegistry) ValidateDependencies() []error {
 				models.PromptKind,
 				models.IAMRoleKind,
 				models.CustomModuleKind,
+				models.OpenSearchServerlessKind,
 			}
 			
 			for _, resourceType := range resourceTypes {
@@ -286,6 +287,10 @@ func (r *ResourceRegistry) GetResourcesByType(kind models.ResourceKind) []models
 			case models.IAMRoleKind:
 				if iamRole, ok := resource.Resource.(*models.IAMRole); ok {
 					spec = iamRole.Spec
+				}
+			case models.OpenSearchServerlessKind:
+				if opensearchServerless, ok := resource.Resource.(*models.OpenSearchServerless); ok {
+					spec = opensearchServerless.Spec
 				}
 			}
 			

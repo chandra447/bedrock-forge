@@ -105,8 +105,11 @@ func (s *ScanCommand) printScanResults() {
 		models.LambdaKind,
 		models.ActionGroupKind,
 		models.KnowledgeBaseKind,
+		models.OpenSearchServerlessKind,
 		models.GuardrailKind,
 		models.PromptKind,
+		models.IAMRoleKind,
+		models.CustomModuleKind,
 	}
 
 	for _, kind := range resourceKinds {

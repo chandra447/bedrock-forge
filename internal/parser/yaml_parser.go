@@ -146,6 +146,20 @@ func (p *YAMLParser) parseDocument(content []byte, filePath string, docIndex int
 		}
 		parsedResource.Resource = &iamRole
 
+	case models.CustomModuleKind:
+		var customModule models.CustomModule
+		if err := yaml.Unmarshal(content, &customModule); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal CustomModule: %w", err)
+		}
+		parsedResource.Resource = &customModule
+
+	case models.OpenSearchServerlessKind:
+		var opensearchServerless models.OpenSearchServerless
+		if err := yaml.Unmarshal(content, &opensearchServerless); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal OpenSearchServerless: %w", err)
+		}
+		parsedResource.Resource = &opensearchServerless
+
 	default:
 		return nil, fmt.Errorf("unsupported resource kind: %s", base.Kind)
 	}
@@ -177,6 +191,10 @@ func (p *YAMLParser) ValidateResource(resource *ParsedResource) error {
 		return p.validatePrompt(resource.Resource.(*models.Prompt))
 	case models.IAMRoleKind:
 		return p.validateIAMRole(resource.Resource.(*models.IAMRole))
+	case models.CustomModuleKind:
+		return p.validateCustomModule(resource.Resource.(*models.CustomModule))
+	case models.OpenSearchServerlessKind:
+		return p.validateOpenSearchServerless(resource.Resource.(*models.OpenSearchServerless))
 	}
 
 	return nil
@@ -259,6 +277,20 @@ func (p *YAMLParser) validateIAMRole(iamRole *models.IAMRole) error {
 	}
 	if len(iamRole.Spec.AssumeRolePolicy.Statement) == 0 {
 		return fmt.Errorf("IAM role assumeRolePolicy must have at least one statement")
+	}
+	return nil
+}
+
+func (p *YAMLParser) validateCustomModule(customModule *models.CustomModule) error {
+	if customModule.Spec.Source == "" {
+		return fmt.Errorf("custom module source is required")
+	}
+	return nil
+}
+
+func (p *YAMLParser) validateOpenSearchServerless(opensearchServerless *models.OpenSearchServerless) error {
+	if opensearchServerless.Spec.CollectionName == "" {
+		return fmt.Errorf("OpenSearch Serverless collectionName is required")
 	}
 	return nil
 }

@@ -87,7 +87,34 @@ func (g *HCLGenerator) generateKnowledgeBaseModule(body *hclwrite.Body, resource
 		storageValues := make(map[string]cty.Value)
 		storageValues["type"] = cty.StringVal(knowledgeBase.StorageConfiguration.Type)
 		
-		if knowledgeBase.StorageConfiguration.OpensearchServerlessConfiguration != nil {
+		// Enhanced OpenSearch Serverless configuration (new approach)
+		if knowledgeBase.StorageConfiguration.OpenSearchServerless != nil {
+			osConfig := knowledgeBase.StorageConfiguration.OpenSearchServerless
+			osValues := make(map[string]cty.Value)
+			
+			// Determine collection ARN based on configuration
+			if osConfig.CollectionArn != nil {
+				// Use existing collection ARN
+				osValues["collection_arn"] = cty.StringVal(*osConfig.CollectionArn)
+			} else if osConfig.CollectionName != nil {
+				// Reference auto-created collection by name
+				collectionResourceName := g.sanitizeResourceName(*osConfig.CollectionName)
+				osValues["collection_arn"] = cty.StringVal(fmt.Sprintf("${aws_opensearchserverless_collection.%s.arn}", collectionResourceName))
+			}
+			
+			osValues["vector_index_name"] = cty.StringVal(osConfig.VectorIndexName)
+			
+			// Field mapping
+			fieldMappingValues := make(map[string]cty.Value)
+			fieldMappingValues["vector_field"] = cty.StringVal(osConfig.FieldMapping.VectorField)
+			fieldMappingValues["text_field"] = cty.StringVal(osConfig.FieldMapping.TextField)
+			fieldMappingValues["metadata_field"] = cty.StringVal(osConfig.FieldMapping.MetadataField)
+			
+			osValues["field_mapping"] = cty.ObjectVal(fieldMappingValues)
+			
+			storageValues["opensearch_serverless_configuration"] = cty.ObjectVal(osValues)
+		} else if knowledgeBase.StorageConfiguration.OpensearchServerlessConfiguration != nil {
+			// Legacy OpenSearch Serverless configuration (backward compatibility)
 			osConfig := knowledgeBase.StorageConfiguration.OpensearchServerlessConfiguration
 			osValues := make(map[string]cty.Value)
 			

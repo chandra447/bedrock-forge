@@ -35,6 +35,9 @@ type BedrockEmbeddingModelConfiguration struct {
 type StorageConfiguration struct {
 	Type                             string                            `yaml:"type"`
 	OpensearchServerlessConfiguration *OpensearchServerlessConfiguration `yaml:"opensearchServerlessConfiguration,omitempty"`
+	
+	// Enhanced OpenSearch Serverless configuration with auto-creation support
+	OpenSearchServerless *OpenSearchServerlessReference `yaml:"openSearchServerless,omitempty"`
 }
 
 type OpensearchServerlessConfiguration struct {

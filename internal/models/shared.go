@@ -12,6 +12,7 @@ const (
 	IAMRoleKind                         ResourceKind = "IAMRole"
 	AgentKnowledgeBaseAssociationKind   ResourceKind = "AgentKnowledgeBaseAssociation"
 	CustomModuleKind                    ResourceKind = "CustomModule"
+	OpenSearchServerlessKind            ResourceKind = "OpenSearchServerless"
 )
 
 type BaseResource struct {

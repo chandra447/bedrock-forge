@@ -111,6 +111,7 @@ func (g *HCLGenerator) buildDependencyOrder() ([]models.ResourceKind, error) {
 		models.GuardrailKind,
 		models.PromptKind,
 		models.LambdaKind,
+		models.OpenSearchServerlessKind, // OpenSearch Serverless must be created before KnowledgeBase
 		models.KnowledgeBaseKind,
 		models.ActionGroupKind,
 		models.AgentKind,
@@ -138,6 +139,8 @@ func (g *HCLGenerator) generateModuleCall(body *hclwrite.Body, resource models.B
 		return g.generateIAMRoleModule(body, resource)
 	case models.CustomModuleKind:
 		return g.generateCustomModuleModule(body, resource)
+	case models.OpenSearchServerlessKind:
+		return g.generateOpenSearchServerlessModule(body, resource)
 	default:
 		return fmt.Errorf("unsupported resource kind: %s", resource.Kind)
 	}
