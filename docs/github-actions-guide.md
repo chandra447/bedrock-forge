@@ -13,11 +13,13 @@ This guide shows how to use the Bedrock Forge reusable GitHub Actions workflow t
 
 ## Overview
 
-The Bedrock Forge reusable GitHub Actions workflow provides:
-- **Reusable Workflow**: Call from your repository without copying files
+The Bedrock Forge reusable GitHub Actions workflow lets you deploy AWS Bedrock agents directly from your repository, just like using any other GitHub Action. Simply reference the workflow and provide your AWS role - no complex setup required.
+
+Key features:
+- **Simple Integration**: Use like `actions/checkout` - just specify the action and required parameters
 - **Automated Deployment**: Deploy Bedrock agents on code changes
 - **Multi-Environment Support**: Separate deployments for dev, staging, and production
-- **Security Best Practices**: AWS OIDC authentication without long-lived credentials
+- **Secure by Default**: Uses AWS IAM roles for authentication
 - **Terraform State Management**: S3 backend with DynamoDB locking
 - **OpenSearch Serverless**: Automated creation and configuration
 - **Flexible Configuration**: Customizable versions, regions, and deployment options
@@ -30,13 +32,13 @@ Before using the Bedrock Forge workflow, ensure you have:
 
 - AWS account with appropriate permissions
 - GitHub repository with your Bedrock YAML configurations
-- AWS IAM role configured for GitHub OIDC (or AWS access keys)
+- AWS IAM role configured for GitHub Actions
 - Terraform state S3 bucket (optional but recommended)
 - DynamoDB table for state locking (optional but recommended)
 
 ### 2. Create Workflow File
 
-Create `.github/workflows/deploy-bedrock-agents.yml` in your repository:
+Create `.github/workflows/deploy-bedrock-agents.yml` in your repository. Just like using `actions/checkout`, you specify the action and its required parameters:
 
 ```yaml
 name: Deploy Bedrock Agents
@@ -64,26 +66,11 @@ jobs:
   deploy:
     uses: your-org/bedrock-forge/.github/workflows/bedrock-forge-deploy.yml@main
     with:
-      # Required: AWS configuration
       aws_role: 'arn:aws:iam::123456789012:role/BedrockForgeDeploymentRole'
       aws_region: 'us-east-1'
-      
-      # Environment settings
       environment: ${{ inputs.environment || 'dev' }}
       dry_run: ${{ inputs.dry_run || false }}
-      
-      # Terraform state configuration (recommended)
       tf_state_bucket: 'my-terraform-state-bucket'
-      tf_state_key_prefix: 'bedrock-agents'
-      tf_state_lock_table: 'terraform-locks'
-      
-      # Optional: Source path for YAML files
-      source_path: './bedrock-configs'
-    
-    secrets:
-      # Only needed if not using OIDC
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 ```
 
 **Note:** Replace `your-org/bedrock-forge` with the actual repository where you publish this action.
@@ -112,50 +99,20 @@ jobs:
 | `tf_state_lock_table` | DynamoDB lock table | None | `terraform-locks` |
 | `dry_run` | Plan only mode | `false` | `true` |
 
-### Secrets (Optional)
+### Secrets (Alternative Authentication)
 
 | Secret | Description | When Required |
 |--------|-------------|---------------|
-| `AWS_ACCESS_KEY_ID` | AWS Access Key ID | When not using OIDC |
-| `AWS_SECRET_ACCESS_KEY` | AWS Secret Access Key | When not using OIDC |
+| `AWS_ACCESS_KEY_ID` | AWS Access Key ID | When not using IAM roles |
+| `AWS_SECRET_ACCESS_KEY` | AWS Secret Access Key | When not using IAM roles |
 
 ## Authentication Setup
 
-### AWS OIDC Setup (Recommended)
+### AWS IAM Role Setup
 
-1. **Create OIDC Provider**:
-```bash
-aws iam create-open-id-connect-provider \
-  --url https://token.actions.githubusercontent.com \
-  --client-id-list sts.amazonaws.com \
-  --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1
-```
+Configure an AWS IAM role with the required permissions and trust policy for GitHub Actions:
 
-2. **Create IAM Role with Trust Policy**:
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "Federated": "arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com"
-      },
-      "Action": "sts:AssumeRoleWithWebIdentity",
-      "Condition": {
-        "StringEquals": {
-          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
-        },
-        "StringLike": {
-          "token.actions.githubusercontent.com:sub": "repo:your-org/your-repo:*"
-        }
-      }
-    }
-  ]
-}
-```
-
-3. **Required IAM Permissions**:
+**Required IAM Permissions**:
 ```json
 {
   "Version": "2012-10-17",
@@ -191,11 +148,7 @@ aws iam create-open-id-connect-provider \
 }
 ```
 
-### AWS Access Keys (Alternative)
-
-If you can't use OIDC, store AWS credentials as GitHub secrets:
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
+**Note**: For specific instructions on setting up GitHub OIDC with AWS, refer to the [official AWS documentation](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers_create_oidc_github.html).
 
 ### Terraform Backend Setup (Optional)
 
@@ -235,7 +188,6 @@ jobs:
     uses: your-org/bedrock-forge/.github/workflows/bedrock-forge-deploy.yml@main
     with:
       aws_role: 'arn:aws:iam::123456789012:role/BedrockForgeDevRole'
-      aws_region: 'us-east-1'
       environment: 'dev'
       tf_state_bucket: 'dev-terraform-state'
 
@@ -245,7 +197,6 @@ jobs:
     uses: your-org/bedrock-forge/.github/workflows/bedrock-forge-deploy.yml@main
     with:
       aws_role: 'arn:aws:iam::123456789012:role/BedrockForgeStagingRole'
-      aws_region: 'us-east-1'
       environment: 'staging'
       tf_state_bucket: 'staging-terraform-state'
 
@@ -256,7 +207,6 @@ jobs:
     uses: your-org/bedrock-forge/.github/workflows/bedrock-forge-deploy.yml@main
     with:
       aws_role: 'arn:aws:iam::123456789012:role/BedrockForgeProdRole'
-      aws_region: 'us-east-1'
       environment: 'prod'
       tf_state_bucket: 'prod-terraform-state'
 ```
@@ -302,7 +252,6 @@ jobs:
     uses: your-org/bedrock-forge/.github/workflows/bedrock-forge-deploy.yml@main
     with:
       aws_role: 'arn:aws:iam::123456789012:role/BedrockForgeReadOnlyRole'
-      aws_region: 'us-east-1'
       environment: 'dev'
       dry_run: true  # Only plan, don't apply
       tf_state_bucket: 'dev-terraform-state'
