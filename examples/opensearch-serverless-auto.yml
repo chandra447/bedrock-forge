@@ -1,0 +1,56 @@
+kind: OpenSearchServerless
+metadata:
+  name: "customer-kb-collection"
+  description: "Auto-created OpenSearch Serverless collection for customer knowledge base"
+spec:
+  collectionName: "customer-knowledge-base"
+  description: "Vector search collection for customer FAQ and documentation"
+  type: "VECTORSEARCH"
+  
+  # Encryption policy configuration (auto-generated)
+  encryptionPolicy:
+    name: "customer-kb-encryption-policy"
+    description: "Encryption policy for customer knowledge base collection"
+    # Uses AWS managed key by default, specify kmsKeyId for custom key
+    
+  # Network policy configuration (public access by default)
+  networkPolicy:
+    name: "customer-kb-network-policy"
+    description: "Network policy for customer knowledge base collection"
+    # Default: public access, configure access for VPC-only if needed
+    # access:
+    #   - sourceType: "vpc"
+    #     sourceVPCEs: ["vpce-12345678"]
+    
+  # Access policy configuration with Bedrock auto-configuration
+  accessPolicy:
+    name: "customer-kb-access-policy"
+    description: "Data access policy for customer knowledge base collection"
+    autoConfigureForBedrock: true  # Automatically adds Bedrock service permissions
+    principals:
+      - "arn:aws:iam::123456789012:role/BedrockExecutionRole"
+      - "arn:aws:iam::123456789012:user/DataAdmin"
+    permissions:
+      - "aoss:CreateCollectionItems"
+      - "aoss:DeleteCollectionItems" 
+      - "aoss:UpdateCollectionItems"
+      - "aoss:DescribeCollectionItems"
+      - "aoss:CreateIndex"
+      - "aoss:DeleteIndex"
+      - "aoss:UpdateIndex"
+      - "aoss:DescribeIndex"
+      - "aoss:ReadDocument"
+      - "aoss:WriteDocument"
+  
+  # Vector index configuration for knowledge base
+  vectorIndex:
+    name: "customer-kb-index"
+    fieldMapping:
+      vectorField: "vector"      # Field name for embeddings
+      textField: "text"          # Field name for document text
+      metadataField: "metadata"  # Field name for document metadata
+  
+  tags:
+    Environment: "production"
+    Project: "customer-support"
+    ManagedBy: "bedrock-forge"

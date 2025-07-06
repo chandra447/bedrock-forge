@@ -1,0 +1,73 @@
+kind: KnowledgeBase
+metadata:
+  name: "enhanced-faq-kb"
+  description: "Enhanced customer FAQ knowledge base with auto-created OpenSearch Serverless"
+spec:
+  description: "Customer FAQ knowledge base with auto-managed vector storage"
+  
+  knowledgeBaseConfiguration:
+    type: "VECTOR"
+    vectorKnowledgeBaseConfiguration:
+      embeddingModelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v1"
+      embeddingModelConfiguration:
+        bedrockEmbeddingModelConfiguration:
+          dimensions: 1536
+  
+  storageConfiguration:
+    type: "OPENSEARCH_SERVERLESS"
+    # Enhanced OpenSearch Serverless configuration - references auto-created collection
+    openSearchServerless:
+      collectionName: "customer-kb-collection"  # References the auto-created collection
+      vectorIndexName: "customer-kb-index"     # Uses the auto-created index
+      fieldMapping:
+        vectorField: "vector"
+        textField: "text"
+        metadataField: "metadata"
+  
+  dataSources:
+    - name: "faq-documents"
+      type: "S3"
+      s3Configuration:
+        bucketArn: "arn:aws:s3:::company-kb-documents"
+        inclusionPrefixes: ["faq/", "documentation/"]
+        exclusionPrefixes: ["temp/", "drafts/"]
+      
+      chunkingConfiguration:
+        chunkingStrategy: "FIXED_SIZE"
+        fixedSizeChunkingConfiguration:
+          maxTokens: 512
+          overlapPercentage: 20
+      
+      vectorIngestionConfiguration:
+        chunkingConfiguration:
+          chunkingStrategy: "SEMANTIC"
+          semanticChunkingConfiguration:
+            maxTokens: 300
+            bufferSize: 1
+            breakpointPercentileThreshold: 95
+      
+      customTransformation:
+        transformationLambda:
+          lambdaArn: "arn:aws:lambda:us-east-1:123456789012:function:kb-document-preprocessor"
+        intermediateStorage:
+          s3Location:
+            uri: "s3://company-kb-temp/transformations/"
+    
+    - name: "product-manuals"
+      type: "S3"
+      s3Configuration:
+        bucketArn: "arn:aws:s3:::company-product-docs"
+        inclusionPrefixes: ["manuals/current/"]
+      
+      chunkingConfiguration:
+        chunkingStrategy: "SEMANTIC"
+        semanticChunkingConfiguration:
+          maxTokens: 400
+          bufferSize: 2
+          breakpointPercentileThreshold: 90
+  
+  tags:
+    Environment: "production"
+    Project: "customer-support"
+    DataSource: "faq-and-manuals"
+    ManagedBy: "bedrock-forge"

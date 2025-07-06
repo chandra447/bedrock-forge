@@ -28,6 +28,7 @@ Bedrock Forge is an enterprise platform that transforms YAML configurations into
 - **Lambda**: AWS Lambda functions for action groups with runtime and environment settings
 - **ActionGroup**: Agent action capabilities with API schemas and executors (requires agent association)
 - **KnowledgeBase**: Vector knowledge bases with embeddings and data sources
+- **OpenSearchServerless**: Auto-created OpenSearch Serverless collections with security policies for knowledge bases
 - **Guardrail**: Content safety and compliance with filters and policies
 - **Prompt**: Custom prompt templates with variants and inference configuration
 - **IAMRole**: IAM execution roles with policies and permissions
@@ -130,11 +131,32 @@ spec:
 **Important**: When using `lambdaArn`, ensure the Bedrock agent's IAM role has `lambda:InvokeFunction` permission for the specified Lambda function.
 
 ### KnowledgeBase Configuration
+
+**Enhanced with OpenSearch Serverless Auto-Creation (Recommended):**
+
 ```yaml
+# 1. Auto-create OpenSearch Serverless collection with all required policies
+kind: OpenSearchServerless
+metadata:
+  name: "customer-kb-collection"
+spec:
+  collectionName: "customer-knowledge-base"
+  type: "VECTORSEARCH"
+  accessPolicy:
+    autoConfigureForBedrock: true  # Automatically adds Bedrock permissions
+  vectorIndex:
+    name: "customer-kb-index"
+    fieldMapping:
+      vectorField: "vector"
+      textField: "text"
+      metadataField: "metadata"
+
+---
+# 2. Reference the auto-created collection
 kind: KnowledgeBase
 metadata:
   name: "faq-kb"
-  description: "Customer FAQ knowledge base"
+  description: "Customer FAQ knowledge base with auto-managed storage"
 spec:
   knowledgeBaseConfiguration:
     type: "VECTOR"
@@ -142,9 +164,13 @@ spec:
       embeddingModelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v1"
   storageConfiguration:
     type: "OPENSEARCH_SERVERLESS"
-    opensearchServerlessConfiguration:
-      collectionArn: "arn:aws:aoss:us-east-1:123456789012:collection/bedrock-kb"
-      vectorIndexName: "bedrock-knowledge-base-index"
+    openSearchServerless:                    # Enhanced configuration
+      collectionName: "customer-kb-collection"  # References auto-created collection
+      vectorIndexName: "customer-kb-index"
+      fieldMapping:
+        vectorField: "vector"
+        textField: "text"
+        metadataField: "metadata"
   dataSources:
     - name: "faq-documents"
       type: "S3"
@@ -156,6 +182,38 @@ spec:
         fixedSizeChunkingConfiguration:
           maxTokens: 512
           overlapPercentage: 20
+```
+
+**Using Existing OpenSearch Serverless Collection:**
+
+```yaml
+kind: KnowledgeBase
+metadata:
+  name: "existing-collection-kb"
+spec:
+  storageConfiguration:
+    type: "OPENSEARCH_SERVERLESS"
+    openSearchServerless:
+      collectionArn: "arn:aws:aoss:us-east-1:123456789012:collection/existing-kb"
+      vectorIndexName: "existing-index"
+      fieldMapping:
+        vectorField: "embedding_vector"
+        textField: "document_content" 
+        metadataField: "doc_metadata"
+```
+
+**Legacy Configuration (Still Supported):**
+
+```yaml
+storageConfiguration:
+  type: "OPENSEARCH_SERVERLESS"
+  opensearchServerlessConfiguration:  # Legacy format
+    collectionArn: "arn:aws:aoss:us-east-1:123456789012:collection/bedrock-kb"
+    vectorIndexName: "bedrock-knowledge-base-index"
+    fieldMapping:
+      vectorField: "vector"
+      textField: "text"
+      metadataField: "metadata"
 ```
 
 ### Guardrail Configuration
@@ -319,7 +377,7 @@ bedrock-forge version
 
 ### Dependency Management
 Resources are automatically ordered and resolved:
-1. **IAMRole** → **Guardrail** → **Prompt** → **Lambda** → **KnowledgeBase** → **ActionGroup** → **Agent**
+1. **IAMRole** → **Guardrail** → **Prompt** → **Lambda** → **OpenSearchServerless** → **KnowledgeBase** → **ActionGroup** → **Agent**
 2. Cross-resource references use Terraform module outputs (e.g., `${module.guardrail.guardrail_id}`)
 3. Validation ensures all referenced resources exist before generation
 
@@ -432,33 +490,120 @@ tags:
 
 ## GitHub Actions Integration
 
-**Automated Deployment Pipeline:**
+**Reusable Workflow for Validation & Deployment:**
+
+The project includes a comprehensive GitHub Actions workflow (`bedrock-forge-deploy.yml`) that provides:
+
+**Workflow Features:**
+- **Validation-First Approach**: Defaults to validation-only mode for cost-effective testing
+- **Multi-stage Pipeline**: Validate → Package → Deploy → Cleanup (conditional)
+- **Resource Scanning**: Automatic discovery of Lambda functions, schemas, and Bedrock resources
+- **Artifact Management**: Automated packaging of Lambda code and OpenAPI schemas (when deploying)
+- **Environment Support**: Dev, staging, and production with different validation levels
+- **Dry Run Mode**: Plan-only mode for reviewing changes before deployment
+- **State Management**: S3 backend with DynamoDB locking for Terraform state
+
+**Usage in Your Repository:**
+
+**Validation-Only Mode (Default - No AWS Costs):**
+```yaml
+name: Validate Bedrock Configurations
+on:
+  push:
+    branches: [main, develop]
+    paths: ['agents/**', 'lambdas/**', 'action-groups/**', 'knowledge-bases/**']
+  pull_request:
+    paths: ['agents/**', 'lambdas/**', 'action-groups/**', 'knowledge-bases/**']
+
+jobs:
+  validate:
+    uses: ./.github/workflows/bedrock-forge-deploy.yml
+    with:
+      validation_only: true  # Default: true (no deployment, no AWS costs)
+      source_path: '.'
+    # No secrets needed for validation-only mode
+```
+
+**Full Deployment Mode:**
 ```yaml
 name: Deploy Bedrock Agents
 on:
-  push:
-    branches: [main]
-    paths: ['agents/**', 'lambdas/**', 'action-groups/**']
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'dev'
+        type: choice
+        options: ['dev', 'staging', 'prod']
+      dry_run:
+        description: 'Run in dry-run mode'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   deploy:
     uses: ./.github/workflows/bedrock-forge-deploy.yml
     with:
+      validation_only: false  # Enable deployment
       environment: ${{ github.event.inputs.environment || 'dev' }}
-      working_directory: '.'
+      aws_region: 'us-east-1'
+      aws_role: 'arn:aws:iam::123456789012:role/bedrock-forge-deploy-role'
+      tf_state_bucket: 'my-terraform-state-bucket'
+      tf_state_key_prefix: 'bedrock-forge'
+      tf_state_lock_table: 'terraform-state-lock'
+      dry_run: ${{ github.event.inputs.dry_run || false }}
+      source_path: '.'
     secrets: inherit
 ```
 
+**Parameters:**
+
+**Always Optional:**
+- `validation_only`: Run validation only without deployment (default: true)
+- `source_path`: Path to YAML configurations (default: .)
+- `terraform_version`: Terraform version (default: 1.5.0)
+- `go_version`: Go version for building Bedrock Forge (default: 1.21)
+- `bedrock_forge_version`: Version/ref of Bedrock Forge to use (default: main)
+
+**Required for Deployment (when validation_only is false):**
+- `aws_role`: IAM role ARN for deployment
+- `tf_state_bucket`: S3 bucket for Terraform state storage
+- `environment`: Target environment (dev/staging/prod)
+- `aws_region`: AWS region for deployment
+
+**Optional for Deployment:**
+- `tf_state_key_prefix`: Key prefix for Terraform state (default: bedrock-forge)
+- `tf_state_lock_table`: DynamoDB table for state locking
+- `aws_session_name`: AWS session name for assumed role (default: bedrock-forge-deploy)
+- `dry_run`: Plan-only mode without applying changes (default: false)
+
 **Multi-Environment Support:**
-- **Development**: Minimal validation, rapid iteration
-- **Staging**: Full validation, integration testing  
-- **Production**: Enterprise validation, approval workflows
+
+**Validation-Only Mode (Default):**
+- **All Environments**: Fast validation, no AWS costs, runs on every push/PR
+- **Immediate Feedback**: Catch configuration errors before deployment
+- **Cost-Effective**: No AWS resources created, no deployment charges
+
+**Deployment Mode (Optional):**
+- **Development**: Minimal validation, rapid iteration, manual trigger
+- **Staging**: Full validation, integration testing, manual approval
+- **Production**: Enterprise validation, approval workflows, protected branches
 
 **Security Features:**
-- AWS OIDC authentication (no long-lived credentials)
-- IAM roles with least-privilege access
-- Environment-specific role assumption
-- Terraform state management with S3 backend and DynamoDB locking
+- **No Credentials for Validation**: Validation-only mode requires no AWS credentials
+- **AWS OIDC Authentication**: No long-lived credentials for deployment
+- **IAM Roles with Least Privilege**: Environment-specific role assumption
+- **State Management**: Secure S3 backend with DynamoDB locking
+- **Artifact Isolation**: Environment-specific artifact storage
+- **Approval Workflows**: Manual approval gates for production deployments
+
+**Pipeline Stages:**
+1. **Validate**: YAML syntax validation and resource scanning (always runs)
+2. **Package**: Lambda code packaging and schema uploads (only when deploying)
+3. **Deploy**: Terraform planning and application with state management (only when deploying)
+4. **Summary**: Pipeline summary and results (always runs)
 
 ## Usage Patterns
 

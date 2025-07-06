@@ -1,0 +1,54 @@
+kind: KnowledgeBase
+metadata:
+  name: "existing-collection-kb"
+  description: "Knowledge base using existing OpenSearch Serverless collection"
+spec:
+  description: "Knowledge base that connects to an existing OpenSearch Serverless collection"
+  
+  knowledgeBaseConfiguration:
+    type: "VECTOR"
+    vectorKnowledgeBaseConfiguration:
+      embeddingModelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v2"
+      embeddingModelConfiguration:
+        bedrockEmbeddingModelConfiguration:
+          dimensions: 1024
+  
+  storageConfiguration:
+    type: "OPENSEARCH_SERVERLESS"
+    
+    # Option 1: Use enhanced configuration with existing collection ARN
+    openSearchServerless:
+      collectionArn: "arn:aws:aoss:us-east-1:123456789012:collection/existing-enterprise-kb"
+      vectorIndexName: "enterprise-docs-index"
+      fieldMapping:
+        vectorField: "embedding_vector"
+        textField: "document_content"
+        metadataField: "doc_metadata"
+    
+    # Option 2: Legacy configuration (still supported for backward compatibility)
+    # opensearchServerlessConfiguration:
+    #   collectionArn: "arn:aws:aoss:us-east-1:123456789012:collection/existing-enterprise-kb"
+    #   vectorIndexName: "enterprise-docs-index"
+    #   fieldMapping:
+    #     vectorField: "embedding_vector"
+    #     textField: "document_content"
+    #     metadataField: "doc_metadata"
+  
+  dataSources:
+    - name: "enterprise-policies"
+      type: "S3"
+      s3Configuration:
+        bucketArn: "arn:aws:s3:::enterprise-policy-docs"
+        inclusionPrefixes: ["policies/current/", "procedures/"]
+      
+      chunkingConfiguration:
+        chunkingStrategy: "FIXED_SIZE"
+        fixedSizeChunkingConfiguration:
+          maxTokens: 256
+          overlapPercentage: 15
+  
+  tags:
+    Environment: "production"
+    Project: "enterprise-kb"
+    CollectionType: "existing"
+    ManagedBy: "bedrock-forge"
