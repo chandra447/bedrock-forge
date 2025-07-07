@@ -19,13 +19,13 @@ func NewScanner(logger *logrus.Logger) *Scanner {
 }
 
 type ScanResult struct {
-	Files []string
+	Files  []string
 	Errors []error
 }
 
 func (s *Scanner) ScanDirectory(rootPath string, includePatterns []string, excludePatterns []string) (*ScanResult, error) {
 	result := &ScanResult{
-		Files: make([]string, 0),
+		Files:  make([]string, 0),
 		Errors: make([]error, 0),
 	}
 

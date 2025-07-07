@@ -11,9 +11,9 @@ import (
 
 // MockS3Client is a mock implementation for testing
 type MockS3Client struct {
-	logger    *logrus.Logger
-	localDir  string
-	uploads   map[string]string // key -> local file path
+	logger   *logrus.Logger
+	localDir string
+	uploads  map[string]string // key -> local file path
 }
 
 // RealS3Client would be the actual AWS S3 implementation
@@ -34,33 +34,33 @@ func NewMockS3Client(logger *logrus.Logger, localDir string) *MockS3Client {
 // UploadFile uploads a file to S3 (mock implementation saves to local directory)
 func (c *MockS3Client) UploadFile(bucket, key string, filePath string) (string, error) {
 	c.logger.WithFields(logrus.Fields{
-		"bucket":   bucket,
-		"key":      key,
-		"file":     filePath,
+		"bucket": bucket,
+		"key":    key,
+		"file":   filePath,
 	}).Debug("Mock S3 upload file")
-	
+
 	// Create destination directory
 	destPath := filepath.Join(c.localDir, bucket, key)
 	destDir := filepath.Dir(destPath)
 	if err := os.MkdirAll(destDir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create destination directory: %w", err)
 	}
-	
+
 	// Copy file
 	if err := c.copyFile(filePath, destPath); err != nil {
 		return "", fmt.Errorf("failed to copy file: %w", err)
 	}
-	
+
 	// Store upload record
 	s3URI := fmt.Sprintf("s3://%s/%s", bucket, key)
 	c.uploads[key] = destPath
-	
+
 	c.logger.WithFields(logrus.Fields{
 		"bucket": bucket,
 		"key":    key,
 		"uri":    s3URI,
 	}).Info("Mock S3 file uploaded")
-	
+
 	return s3URI, nil
 }
 
@@ -72,29 +72,29 @@ func (c *MockS3Client) UploadContent(bucket, key string, content []byte, content
 		"content_type": contentType,
 		"size":         len(content),
 	}).Debug("Mock S3 upload content")
-	
+
 	// Create destination directory
 	destPath := filepath.Join(c.localDir, bucket, key)
 	destDir := filepath.Dir(destPath)
 	if err := os.MkdirAll(destDir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create destination directory: %w", err)
 	}
-	
+
 	// Write content to file
 	if err := os.WriteFile(destPath, content, 0644); err != nil {
 		return "", fmt.Errorf("failed to write content: %w", err)
 	}
-	
+
 	// Store upload record
 	s3URI := fmt.Sprintf("s3://%s/%s", bucket, key)
 	c.uploads[key] = destPath
-	
+
 	c.logger.WithFields(logrus.Fields{
 		"bucket": bucket,
 		"key":    key,
 		"uri":    s3URI,
 	}).Info("Mock S3 content uploaded")
-	
+
 	return s3URI, nil
 }
 
@@ -110,13 +110,13 @@ func (c *MockS3Client) copyFile(src, dst string) error {
 		return err
 	}
 	defer sourceFile.Close()
-	
+
 	destFile, err := os.Create(dst)
 	if err != nil {
 		return err
 	}
 	defer destFile.Close()
-	
+
 	_, err = io.Copy(destFile, sourceFile)
 	return err
 }

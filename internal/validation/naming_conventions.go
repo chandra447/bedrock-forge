@@ -12,13 +12,13 @@ import (
 type NamingConventionConfig struct {
 	// Global naming rules applied to all resources
 	Global *NamingRules `yaml:"global,omitempty"`
-	
+
 	// Resource-specific naming rules
 	Resources map[string]*NamingRules `yaml:"resources,omitempty"`
-	
+
 	// Team-specific naming rules
 	Teams map[string]*NamingRules `yaml:"teams,omitempty"`
-	
+
 	// Environment-specific naming rules
 	Environments map[string]*NamingRules `yaml:"environments,omitempty"`
 }
@@ -27,34 +27,34 @@ type NamingConventionConfig struct {
 type NamingRules struct {
 	// Required prefix for resource names
 	Prefix string `yaml:"prefix,omitempty"`
-	
-	// Required suffix for resource names  
+
+	// Required suffix for resource names
 	Suffix string `yaml:"suffix,omitempty"`
-	
+
 	// Regex pattern the name must match
 	Pattern string `yaml:"pattern,omitempty"`
-	
+
 	// Compiled regex pattern (internal use)
 	CompiledPattern *regexp.Regexp `yaml:"-"`
-	
+
 	// Minimum length for resource names
 	MinLength int `yaml:"minLength,omitempty"`
-	
+
 	// Maximum length for resource names
 	MaxLength int `yaml:"maxLength,omitempty"`
-	
+
 	// Allowed characters (regex character class)
 	AllowedChars string `yaml:"allowedChars,omitempty"`
-	
+
 	// Forbidden characters (regex character class)
 	ForbiddenChars string `yaml:"forbiddenChars,omitempty"`
-	
+
 	// Whether to enforce lowercase names
 	ForceLowercase bool `yaml:"forceLowercase,omitempty"`
-	
+
 	// Whether to enforce uppercase names
 	ForceUppercase bool `yaml:"forceUppercase,omitempty"`
-	
+
 	// Custom validation messages
 	ValidationMessage string `yaml:"validationMessage,omitempty"`
 }
@@ -69,36 +69,36 @@ func NewNamingValidator(config *NamingConventionConfig) (*NamingValidator, error
 	validator := &NamingValidator{
 		config: config,
 	}
-	
+
 	// Compile all regex patterns
 	if err := validator.compilePatterns(); err != nil {
 		return nil, fmt.Errorf("failed to compile naming patterns: %w", err)
 	}
-	
+
 	return validator, nil
 }
 
 // compilePatterns compiles all regex patterns in the configuration
 func (v *NamingValidator) compilePatterns() error {
 	patterns := []*NamingRules{}
-	
+
 	// Collect all naming rules
 	if v.config.Global != nil {
 		patterns = append(patterns, v.config.Global)
 	}
-	
+
 	for _, rules := range v.config.Resources {
 		patterns = append(patterns, rules)
 	}
-	
+
 	for _, rules := range v.config.Teams {
 		patterns = append(patterns, rules)
 	}
-	
+
 	for _, rules := range v.config.Environments {
 		patterns = append(patterns, rules)
 	}
-	
+
 	// Compile each pattern
 	for _, rules := range patterns {
 		if rules.Pattern != "" {
@@ -109,18 +109,18 @@ func (v *NamingValidator) compilePatterns() error {
 			rules.CompiledPattern = compiled
 		}
 	}
-	
+
 	return nil
 }
 
 // ValidateResourceName validates a resource name against naming conventions
 func (v *NamingValidator) ValidateResourceName(resource interface{}, context *ValidationContext) []ValidationError {
 	errors := []ValidationError{}
-	
+
 	// Extract resource metadata
 	var metadata models.Metadata
 	var resourceType string
-	
+
 	switch r := resource.(type) {
 	case *models.Agent:
 		metadata = r.Metadata
@@ -147,48 +147,48 @@ func (v *NamingValidator) ValidateResourceName(resource interface{}, context *Va
 		// Skip unknown resource types
 		return errors
 	}
-	
+
 	// Get applicable naming rules
 	rules := v.getApplicableRules(resourceType, context)
-	
+
 	// Validate against each rule
 	for _, rule := range rules {
 		if err := v.validateNameAgainstRule(metadata.Name, rule, resourceType, context); err != nil {
 			errors = append(errors, *err)
 		}
 	}
-	
+
 	return errors
 }
 
 // getApplicableRules returns the naming rules that apply to a resource
 func (v *NamingValidator) getApplicableRules(resourceType string, context *ValidationContext) []*NamingRules {
 	rules := []*NamingRules{}
-	
+
 	// Add global rules
 	if v.config.Global != nil {
 		rules = append(rules, v.config.Global)
 	}
-	
+
 	// Add resource-specific rules
 	if resourceRules, exists := v.config.Resources[resourceType]; exists {
 		rules = append(rules, resourceRules)
 	}
-	
+
 	// Add team-specific rules
 	if context != nil && context.Team != "" {
 		if teamRules, exists := v.config.Teams[context.Team]; exists {
 			rules = append(rules, teamRules)
 		}
 	}
-	
+
 	// Add environment-specific rules
 	if context != nil && context.Environment != "" {
 		if envRules, exists := v.config.Environments[context.Environment]; exists {
 			rules = append(rules, envRules)
 		}
 	}
-	
+
 	return rules
 }
 
@@ -203,7 +203,7 @@ func (v *NamingValidator) validateNameAgainstRule(name string, rule *NamingRules
 			Field:    "metadata.name",
 		}
 	}
-	
+
 	// Check suffix
 	if rule.Suffix != "" && !strings.HasSuffix(name, rule.Suffix) {
 		return &ValidationError{
@@ -213,7 +213,7 @@ func (v *NamingValidator) validateNameAgainstRule(name string, rule *NamingRules
 			Field:    "metadata.name",
 		}
 	}
-	
+
 	// Check regex pattern
 	if rule.CompiledPattern != nil && !rule.CompiledPattern.MatchString(name) {
 		return &ValidationError{
@@ -223,7 +223,7 @@ func (v *NamingValidator) validateNameAgainstRule(name string, rule *NamingRules
 			Field:    "metadata.name",
 		}
 	}
-	
+
 	// Check length constraints
 	if rule.MinLength > 0 && len(name) < rule.MinLength {
 		return &ValidationError{
@@ -233,7 +233,7 @@ func (v *NamingValidator) validateNameAgainstRule(name string, rule *NamingRules
 			Field:    "metadata.name",
 		}
 	}
-	
+
 	if rule.MaxLength > 0 && len(name) > rule.MaxLength {
 		return &ValidationError{
 			Type:     "naming_convention",
@@ -242,7 +242,7 @@ func (v *NamingValidator) validateNameAgainstRule(name string, rule *NamingRules
 			Field:    "metadata.name",
 		}
 	}
-	
+
 	// Check allowed characters
 	if rule.AllowedChars != "" {
 		allowedPattern := fmt.Sprintf("^[%s]+$", rule.AllowedChars)
@@ -255,7 +255,7 @@ func (v *NamingValidator) validateNameAgainstRule(name string, rule *NamingRules
 			}
 		}
 	}
-	
+
 	// Check forbidden characters
 	if rule.ForbiddenChars != "" {
 		forbiddenPattern := fmt.Sprintf("[%s]", rule.ForbiddenChars)
@@ -268,7 +268,7 @@ func (v *NamingValidator) validateNameAgainstRule(name string, rule *NamingRules
 			}
 		}
 	}
-	
+
 	// Check case enforcement
 	if rule.ForceLowercase && name != strings.ToLower(name) {
 		return &ValidationError{
@@ -278,7 +278,7 @@ func (v *NamingValidator) validateNameAgainstRule(name string, rule *NamingRules
 			Field:    "metadata.name",
 		}
 	}
-	
+
 	if rule.ForceUppercase && name != strings.ToUpper(name) {
 		return &ValidationError{
 			Type:     "naming_convention",
@@ -287,7 +287,7 @@ func (v *NamingValidator) validateNameAgainstRule(name string, rule *NamingRules
 			Field:    "metadata.name",
 		}
 	}
-	
+
 	return nil
 }
 
@@ -394,31 +394,31 @@ func EnterpriseNamingConventions() *NamingConventionConfig {
 		},
 		Resources: map[string]*NamingRules{
 			"Agent": {
-				Pattern: "^[a-z]+-(dev|staging|prod)-[a-z0-9-]+-agent$",
+				Pattern:           "^[a-z]+-(dev|staging|prod)-[a-z0-9-]+-agent$",
 				ValidationMessage: "Agent names must follow pattern: <team>-<env>-<name>-agent",
 			},
 			"Lambda": {
-				Pattern: "^[a-z]+-(dev|staging|prod)-[a-z0-9-]+-lambda$",
+				Pattern:           "^[a-z]+-(dev|staging|prod)-[a-z0-9-]+-lambda$",
 				ValidationMessage: "Lambda names must follow pattern: <team>-<env>-<name>-lambda",
 			},
 			"ActionGroup": {
-				Pattern: "^[a-z]+-(dev|staging|prod)-[a-z0-9-]+-action-group$",
+				Pattern:           "^[a-z]+-(dev|staging|prod)-[a-z0-9-]+-action-group$",
 				ValidationMessage: "ActionGroup names must follow pattern: <team>-<env>-<name>-action-group",
 			},
 			"KnowledgeBase": {
-				Pattern: "^[a-z]+-(dev|staging|prod)-[a-z0-9-]+-kb$",
+				Pattern:           "^[a-z]+-(dev|staging|prod)-[a-z0-9-]+-kb$",
 				ValidationMessage: "KnowledgeBase names must follow pattern: <team>-<env>-<name>-kb",
 			},
 			"Guardrail": {
-				Pattern: "^[a-z]+-(dev|staging|prod)-[a-z0-9-]+-guardrail$",
+				Pattern:           "^[a-z]+-(dev|staging|prod)-[a-z0-9-]+-guardrail$",
 				ValidationMessage: "Guardrail names must follow pattern: <team>-<env>-<name>-guardrail",
 			},
 			"Prompt": {
-				Pattern: "^[a-z]+-(dev|staging|prod)-[a-z0-9-]+-prompt$",
+				Pattern:           "^[a-z]+-(dev|staging|prod)-[a-z0-9-]+-prompt$",
 				ValidationMessage: "Prompt names must follow pattern: <team>-<env>-<name>-prompt",
 			},
 			"IAMRole": {
-				Pattern: "^[a-z]+-(dev|staging|prod)-[a-z0-9-]+-role$",
+				Pattern:           "^[a-z]+-(dev|staging|prod)-[a-z0-9-]+-role$",
 				ValidationMessage: "IAMRole names must follow pattern: <team>-<env>-<name>-role",
 			},
 		},

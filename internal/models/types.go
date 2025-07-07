@@ -3,7 +3,7 @@
 //
 // - shared.go: Common types (ResourceKind, BaseResource, Metadata)
 // - agent.go: Agent-related types
-// - lambda.go: Lambda-related types  
+// - lambda.go: Lambda-related types
 // - actiongroup.go: ActionGroup-related types
 // - knowledgebase.go: KnowledgeBase-related types
 // - guardrail.go: Guardrail-related types

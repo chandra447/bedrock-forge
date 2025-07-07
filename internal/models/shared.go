@@ -3,16 +3,16 @@ package models
 type ResourceKind string
 
 const (
-	AgentKind                           ResourceKind = "Agent"
-	LambdaKind                          ResourceKind = "Lambda"
-	ActionGroupKind                     ResourceKind = "ActionGroup"
-	KnowledgeBaseKind                   ResourceKind = "KnowledgeBase"
-	GuardrailKind                       ResourceKind = "Guardrail"
-	PromptKind                          ResourceKind = "Prompt"
-	IAMRoleKind                         ResourceKind = "IAMRole"
-	AgentKnowledgeBaseAssociationKind   ResourceKind = "AgentKnowledgeBaseAssociation"
-	CustomModuleKind                    ResourceKind = "CustomModule"
-	OpenSearchServerlessKind            ResourceKind = "OpenSearchServerless"
+	AgentKind                         ResourceKind = "Agent"
+	LambdaKind                        ResourceKind = "Lambda"
+	ActionGroupKind                   ResourceKind = "ActionGroup"
+	KnowledgeBaseKind                 ResourceKind = "KnowledgeBase"
+	GuardrailKind                     ResourceKind = "Guardrail"
+	PromptKind                        ResourceKind = "Prompt"
+	IAMRoleKind                       ResourceKind = "IAMRole"
+	AgentKnowledgeBaseAssociationKind ResourceKind = "AgentKnowledgeBaseAssociation"
+	CustomModuleKind                  ResourceKind = "CustomModule"
+	OpenSearchServerlessKind          ResourceKind = "OpenSearchServerless"
 )
 
 type BaseResource struct {

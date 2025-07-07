@@ -18,10 +18,10 @@ import (
 
 // LambdaPackager handles packaging Lambda functions and uploading to S3
 type LambdaPackager struct {
-	logger    *logrus.Logger
-	registry  *registry.ResourceRegistry
-	s3Client  S3Client
-	config    *PackagerConfig
+	logger   *logrus.Logger
+	registry *registry.ResourceRegistry
+	s3Client S3Client
+	config   *PackagerConfig
 }
 
 // PackagerConfig holds configuration for the packager
@@ -62,11 +62,11 @@ func NewLambdaPackager(logger *logrus.Logger, registry *registry.ResourceRegistr
 			".env", ".env.*",
 		}
 	}
-	
+
 	if config.TempDir == "" {
 		config.TempDir = "/tmp/bedrock-forge"
 	}
-	
+
 	return &LambdaPackager{
 		logger:   logger,
 		registry: registry,
@@ -78,39 +78,39 @@ func NewLambdaPackager(logger *logrus.Logger, registry *registry.ResourceRegistr
 // PackageAllLambdas discovers and packages all Lambda functions
 func (p *LambdaPackager) PackageAllLambdas(baseDir string) (map[string]*LambdaPackage, error) {
 	p.logger.Info("Starting Lambda packaging process...")
-	
+
 	packages := make(map[string]*LambdaPackage)
-	
+
 	// Get all Lambda resources from registry
 	lambdas := p.registry.GetResourcesByType(models.LambdaKind)
-	
+
 	for _, lambda := range lambdas {
 		lambdaSpec, ok := lambda.Spec.(models.LambdaSpec)
 		if !ok {
 			p.logger.WithField("lambda", lambda.Metadata.Name).Warn("Invalid Lambda spec, skipping")
 			continue
 		}
-		
+
 		// Only package directory-based Lambdas
 		if lambdaSpec.Code.Source != "directory" {
 			p.logger.WithField("lambda", lambda.Metadata.Name).Debug("Lambda uses non-directory source, skipping packaging")
 			continue
 		}
-		
+
 		// Find Lambda directory
 		lambdaDir, err := p.findLambdaDirectory(baseDir, lambda.Metadata.Name)
 		if err != nil {
 			p.logger.WithError(err).WithField("lambda", lambda.Metadata.Name).Error("Failed to find Lambda directory")
 			continue
 		}
-		
+
 		// Package the Lambda
 		pkg, err := p.packageLambda(lambda.Metadata.Name, lambdaDir)
 		if err != nil {
 			p.logger.WithError(err).WithField("lambda", lambda.Metadata.Name).Error("Failed to package Lambda")
 			continue
 		}
-		
+
 		packages[lambda.Metadata.Name] = pkg
 		p.logger.WithFields(logrus.Fields{
 			"lambda": lambda.Metadata.Name,
@@ -118,7 +118,7 @@ func (p *LambdaPackager) PackageAllLambdas(baseDir string) (map[string]*LambdaPa
 			"s3_uri": pkg.S3URI,
 		}).Info("Successfully packaged Lambda")
 	}
-	
+
 	p.logger.WithField("count", len(packages)).Info("Lambda packaging completed")
 	return packages, nil
 }
@@ -126,12 +126,12 @@ func (p *LambdaPackager) PackageAllLambdas(baseDir string) (map[string]*LambdaPa
 // findLambdaDirectory locates the directory containing the Lambda code
 func (p *LambdaPackager) findLambdaDirectory(baseDir, lambdaName string) (string, error) {
 	var lambdaDir string
-	
+
 	err := filepath.Walk(baseDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		
+
 		// Look for lambda.yml files
 		if !info.IsDir() && (filepath.Base(path) == "lambda.yml" || filepath.Base(path) == "lambda.yaml") {
 			// Check if this lambda.yml is for our target Lambda
@@ -140,18 +140,18 @@ func (p *LambdaPackager) findLambdaDirectory(baseDir, lambdaName string) (string
 				return filepath.SkipDir // Found it, stop searching
 			}
 		}
-		
+
 		return nil
 	})
-	
+
 	if err != nil {
 		return "", fmt.Errorf("error walking directory: %w", err)
 	}
-	
+
 	if lambdaDir == "" {
 		return "", fmt.Errorf("Lambda directory not found for %s", lambdaName)
 	}
-	
+
 	return lambdaDir, nil
 }
 
@@ -161,7 +161,7 @@ func (p *LambdaPackager) isTargetLambda(yamlPath, targetName string) bool {
 	// we'd parse the YAML and check the metadata.name field
 	dir := filepath.Dir(yamlPath)
 	dirName := filepath.Base(dir)
-	
+
 	// Check if directory name matches Lambda name
 	return strings.EqualFold(dirName, targetName) || strings.EqualFold(dirName, strings.ReplaceAll(targetName, "_", "-"))
 }
@@ -172,14 +172,14 @@ func (p *LambdaPackager) packageLambda(lambdaName, lambdaDir string) (*LambdaPac
 		"lambda": lambdaName,
 		"dir":    lambdaDir,
 	}).Debug("Packaging Lambda function")
-	
+
 	// Create temp directory for packaging
 	tempDir := filepath.Join(p.config.TempDir, lambdaName)
 	if err := os.MkdirAll(tempDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create temp directory: %w", err)
 	}
 	defer os.RemoveAll(tempDir)
-	
+
 	// Create ZIP file
 	zipPath := filepath.Join(tempDir, fmt.Sprintf("%s.zip", lambdaName))
 	zipFile, err := os.Create(zipPath)
@@ -187,42 +187,42 @@ func (p *LambdaPackager) packageLambda(lambdaName, lambdaDir string) (*LambdaPac
 		return nil, fmt.Errorf("failed to create ZIP file: %w", err)
 	}
 	defer zipFile.Close()
-	
+
 	zipWriter := zip.NewWriter(zipFile)
 	defer zipWriter.Close()
-	
+
 	// Add files to ZIP
 	err = p.addDirectoryToZip(zipWriter, lambdaDir, "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to add files to ZIP: %w", err)
 	}
-	
+
 	// Close ZIP writer to flush contents
 	if err := zipWriter.Close(); err != nil {
 		return nil, fmt.Errorf("failed to close ZIP writer: %w", err)
 	}
-	
+
 	// Get file info
 	zipInfo, err := zipFile.Stat()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ZIP file info: %w", err)
 	}
-	
+
 	// Calculate hash
 	hash, err := p.calculateFileHash(zipPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate file hash: %w", err)
 	}
-	
+
 	// Generate S3 key
 	s3Key := p.generateS3Key(lambdaName, hash)
-	
+
 	// Upload to S3
 	s3URI, err := p.s3Client.UploadFile(p.config.S3Bucket, s3Key, zipPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to upload to S3: %w", err)
 	}
-	
+
 	return &LambdaPackage{
 		Name:     lambdaName,
 		FilePath: zipPath,
@@ -240,13 +240,13 @@ func (p *LambdaPackager) addDirectoryToZip(zipWriter *zip.Writer, sourceDir, bas
 		if err != nil {
 			return err
 		}
-		
+
 		// Get relative path
 		relPath, err := filepath.Rel(sourceDir, path)
 		if err != nil {
 			return err
 		}
-		
+
 		// Skip excluded files
 		if p.shouldExcludeFile(relPath, info) {
 			if info.IsDir() {
@@ -254,28 +254,28 @@ func (p *LambdaPackager) addDirectoryToZip(zipWriter *zip.Writer, sourceDir, bas
 			}
 			return nil
 		}
-		
+
 		// Skip directories (they're created automatically)
 		if info.IsDir() {
 			return nil
 		}
-		
+
 		// Create ZIP entry
 		zipPath := filepath.Join(basePath, relPath)
 		zipPath = filepath.ToSlash(zipPath) // Ensure forward slashes in ZIP
-		
+
 		zipEntry, err := zipWriter.Create(zipPath)
 		if err != nil {
 			return err
 		}
-		
+
 		// Copy file contents
 		file, err := os.Open(path)
 		if err != nil {
 			return err
 		}
 		defer file.Close()
-		
+
 		_, err = io.Copy(zipEntry, file)
 		return err
 	})
@@ -284,7 +284,7 @@ func (p *LambdaPackager) addDirectoryToZip(zipWriter *zip.Writer, sourceDir, bas
 // shouldExcludeFile checks if a file should be excluded from packaging
 func (p *LambdaPackager) shouldExcludeFile(relPath string, info os.FileInfo) bool {
 	fileName := info.Name()
-	
+
 	for _, pattern := range p.config.ExcludePatterns {
 		// Simple pattern matching (could be enhanced with glob patterns)
 		if strings.HasSuffix(pattern, "*") {
@@ -296,7 +296,7 @@ func (p *LambdaPackager) shouldExcludeFile(relPath string, info os.FileInfo) boo
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -307,18 +307,18 @@ func (p *LambdaPackager) calculateFileHash(filePath string) (string, error) {
 		return "", err
 	}
 	defer file.Close()
-	
+
 	hasher := sha256.New()
 	if _, err := io.Copy(hasher, file); err != nil {
 		return "", err
 	}
-	
+
 	return fmt.Sprintf("%x", hasher.Sum(nil)), nil
 }
 
 // generateS3Key creates a unique S3 key for the Lambda package
 func (p *LambdaPackager) generateS3Key(lambdaName, hash string) string {
 	timestamp := time.Now().Unix()
-	return fmt.Sprintf("%s/lambdas/%s/%d-%s.zip", 
+	return fmt.Sprintf("%s/lambdas/%s/%d-%s.zip",
 		p.config.S3KeyPrefix, lambdaName, timestamp, hash[:8])
 }

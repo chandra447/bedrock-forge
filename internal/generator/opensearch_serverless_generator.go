@@ -1,8 +1,8 @@
 package generator
 
 import (
-	"fmt"
 	"encoding/json"
+	"fmt"
 
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/zclconf/go-cty/cty"
@@ -19,13 +19,13 @@ func (g *HCLGenerator) generateOpenSearchServerlessModule(body *hclwrite.Body, r
 		if !mapOk {
 			return fmt.Errorf("invalid opensearch serverless spec format")
 		}
-		
+
 		// Convert map to OpenSearchServerlessSpec
 		specJSON, err := json.Marshal(specMap)
 		if err != nil {
 			return fmt.Errorf("failed to marshal opensearch serverless spec: %w", err)
 		}
-		
+
 		if err := json.Unmarshal(specJSON, &opensearchServerless); err != nil {
 			return fmt.Errorf("failed to unmarshal opensearch serverless spec: %w", err)
 		}
@@ -93,7 +93,7 @@ func (g *HCLGenerator) generateEncryptionPolicy(body *hclwrite.Body, resourceNam
 	policyDoc := map[string]interface{}{
 		"Rules": []map[string]interface{}{
 			{
-				"Resource": []string{fmt.Sprintf("collection/%s", collectionName)},
+				"Resource":     []string{fmt.Sprintf("collection/%s", collectionName)},
 				"ResourceType": "collection",
 			},
 		},
@@ -226,7 +226,7 @@ func (g *HCLGenerator) generateAccessPolicy(body *hclwrite.Body, resourceName, c
 	if policy != nil && policy.AutoConfigureForBedrock {
 		// Add Bedrock service principal
 		principals = append(principals, "bedrock.amazonaws.com")
-		
+
 		// Add comprehensive permissions for Bedrock operations
 		bedrockPermissions := []string{
 			"aoss:CreateIndex",
@@ -240,7 +240,7 @@ func (g *HCLGenerator) generateAccessPolicy(body *hclwrite.Body, resourceName, c
 			"aoss:UpdateCollectionItems",
 			"aoss:DescribeCollectionItems",
 		}
-		
+
 		// Merge with existing permissions
 		permissionSet := make(map[string]bool)
 		for _, perm := range permissions {
@@ -249,7 +249,7 @@ func (g *HCLGenerator) generateAccessPolicy(body *hclwrite.Body, resourceName, c
 		for _, perm := range bedrockPermissions {
 			permissionSet[perm] = true
 		}
-		
+
 		permissions = make([]string, 0, len(permissionSet))
 		for perm := range permissionSet {
 			permissions = append(permissions, perm)
@@ -265,7 +265,7 @@ func (g *HCLGenerator) generateAccessPolicy(body *hclwrite.Body, resourceName, c
 						fmt.Sprintf("collection/%s", collectionName),
 						fmt.Sprintf("index/%s/*", collectionName),
 					},
-					"Permission": permissions,
+					"Permission":   permissions,
 					"ResourceType": "collection",
 				},
 				{
@@ -273,7 +273,7 @@ func (g *HCLGenerator) generateAccessPolicy(body *hclwrite.Body, resourceName, c
 						fmt.Sprintf("collection/%s", collectionName),
 						fmt.Sprintf("index/%s/*", collectionName),
 					},
-					"Permission": permissions,
+					"Permission":   permissions,
 					"ResourceType": "index",
 				},
 			},
@@ -299,7 +299,7 @@ func (g *HCLGenerator) generateCollection(body *hclwrite.Body, resourceName, col
 	collectionBody := collectionBlock.Body()
 
 	collectionBody.SetAttributeValue("name", cty.StringVal(collectionName))
-	
+
 	// Collection type
 	collectionType := "VECTORSEARCH"
 	if spec.Type != "" {
@@ -342,7 +342,7 @@ func (g *HCLGenerator) generateCollection(body *hclwrite.Body, resourceName, col
 func (g *HCLGenerator) generateVectorIndex(body *hclwrite.Body, resourceName, collectionName string, vectorIndex *models.VectorIndexConfig) error {
 	// Note: Vector index creation is typically done via REST API after collection is created
 	// For now, we'll add a local-exec provisioner to create the index
-	
+
 	// Create null resource for index creation
 	indexBlock := body.AppendNewBlock("resource", []string{"null_resource", fmt.Sprintf("%s_vector_index", resourceName)})
 	indexBody := indexBlock.Body()

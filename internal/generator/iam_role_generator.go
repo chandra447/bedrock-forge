@@ -12,7 +12,7 @@ import (
 // generateAutoIAMRole creates an auto-generated IAM role for Bedrock agents
 func (g *HCLGenerator) generateAutoIAMRole(body *hclwrite.Body, agentName string, iamConfig *models.IAMRoleConfig) error {
 	roleName := fmt.Sprintf("%s_execution_role", g.sanitizeResourceName(agentName))
-	
+
 	g.logger.WithField("agent", agentName).Debug("Generating auto IAM role")
 
 	// Create module block
@@ -167,7 +167,7 @@ func (g *HCLGenerator) generateIAMRoleModule(body *hclwrite.Body, resource model
 	}
 
 	roleName := g.sanitizeResourceName(resource.Metadata.Name)
-	
+
 	g.logger.WithField("iam_role", resource.Metadata.Name).Debug("Generating IAM role module")
 
 	// Create module block
@@ -175,12 +175,12 @@ func (g *HCLGenerator) generateIAMRoleModule(body *hclwrite.Body, resource model
 	moduleBody := moduleBlock.Body()
 
 	// Set module source
-	moduleBody.SetAttributeValue("source", cty.StringVal(fmt.Sprintf("%s//modules/iam-role?ref=%s", 
+	moduleBody.SetAttributeValue("source", cty.StringVal(fmt.Sprintf("%s//modules/iam-role?ref=%s",
 		g.config.ModuleRegistry, g.config.ModuleVersion)))
 
 	// Set basic attributes
 	moduleBody.SetAttributeValue("role_name", cty.StringVal(resource.Metadata.Name))
-	
+
 	if roleSpec.Description != "" {
 		moduleBody.SetAttributeValue("description", cty.StringVal(roleSpec.Description))
 	}
@@ -196,7 +196,7 @@ func (g *HCLGenerator) generateIAMRoleModule(body *hclwrite.Body, resource model
 		var policies []cty.Value
 		for _, policy := range roleSpec.Policies {
 			policyObj := cty.ObjectVal(map[string]cty.Value{
-				"policy_arn":  cty.StringVal(policy.PolicyArn),
+				"policy_arn": cty.StringVal(policy.PolicyArn),
 			})
 			if policy.PolicyName != "" {
 				policyObj = cty.ObjectVal(map[string]cty.Value{
@@ -238,11 +238,10 @@ func (g *HCLGenerator) generateIAMRoleModule(body *hclwrite.Body, resource model
 	return nil
 }
 
-
 // buildAssumeRolePolicy converts AssumeRolePolicy to cty.Value
 func (g *HCLGenerator) buildAssumeRolePolicy(policy *models.AssumeRolePolicy) cty.Value {
 	statements := make([]cty.Value, len(policy.Statement))
-	
+
 	for i, stmt := range policy.Statement {
 		statementObj := map[string]cty.Value{
 			"effect": cty.StringVal(stmt.Effect),
@@ -306,7 +305,7 @@ func (g *HCLGenerator) buildAssumeRolePolicy(policy *models.AssumeRolePolicy) ct
 // buildPolicyDocument converts IAMPolicyDocument to cty.Value
 func (g *HCLGenerator) buildPolicyDocument(policy *models.IAMPolicyDocument) cty.Value {
 	statements := make([]cty.Value, len(policy.Statement))
-	
+
 	for i, stmt := range policy.Statement {
 		statementObj := map[string]cty.Value{
 			"effect": cty.StringVal(stmt.Effect),
@@ -367,4 +366,3 @@ func (g *HCLGenerator) buildPolicyDocument(policy *models.IAMPolicyDocument) cty
 		"statement": cty.ListVal(statements),
 	})
 }
-

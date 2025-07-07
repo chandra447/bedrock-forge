@@ -75,7 +75,7 @@ func (c *GenerateCommand) Execute(scanPath, outputDir string) error {
 	}
 
 	hclGenerator := generator.NewHCLGenerator(c.logger, resourceRegistry, generatorConfig)
-	
+
 	// Set generation context with packaging results
 	generationContext := generator.NewGenerationContext()
 	generationContext.LambdaPackages = lambdaPackages
@@ -133,9 +133,9 @@ func (c *GenerateCommand) scanAndParseFiles(scanPath string, resourceRegistry *r
 		for _, resource := range resources {
 			if err := resourceRegistry.AddResource(resource); err != nil {
 				c.logger.WithError(err).WithFields(logrus.Fields{
-					"file":     path,
-					"kind":     resource.Kind,
-					"name":     resource.Metadata.Name,
+					"file": path,
+					"kind": resource.Kind,
+					"name": resource.Metadata.Name,
 				}).Warn("Failed to add resource to registry")
 			}
 		}
@@ -151,37 +151,37 @@ func isYAMLFile(path string) bool {
 
 func (c *GenerateCommand) packageArtifacts(scanPath string, resourceRegistry *registry.ResourceRegistry) (map[string]*packager.LambdaPackage, map[string]*packager.SchemaPackage, error) {
 	c.logger.Info("Starting artifact packaging...")
-	
+
 	// Create S3 client (using mock for now)
 	s3LocalDir := filepath.Join(scanPath, ".bedrock-forge", "s3-mock")
 	s3Client := packager.NewMockS3Client(c.logger, s3LocalDir)
-	
+
 	// Package configuration
 	packagerConfig := &packager.PackagerConfig{
 		S3Bucket:    "bedrock-artifacts",
 		S3KeyPrefix: "bedrock-forge",
 		TempDir:     filepath.Join(scanPath, ".bedrock-forge", "temp"),
 	}
-	
+
 	// Package Lambda functions
 	lambdaPackager := packager.NewLambdaPackager(c.logger, resourceRegistry, s3Client, packagerConfig)
 	lambdaPackages, err := lambdaPackager.PackageAllLambdas(scanPath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to package Lambdas: %w", err)
 	}
-	
+
 	// Extract OpenAPI schemas
 	schemaExtractor := packager.NewSchemaExtractor(c.logger, resourceRegistry, s3Client, packagerConfig)
 	schemaPackages, err := schemaExtractor.ExtractAllSchemas(scanPath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to extract schemas: %w", err)
 	}
-	
+
 	// Log summary
 	c.logger.WithFields(logrus.Fields{
 		"lambda_packages": len(lambdaPackages),
 		"schema_packages": len(schemaPackages),
 	}).Info("Artifact packaging completed")
-	
+
 	return lambdaPackages, schemaPackages, nil
 }

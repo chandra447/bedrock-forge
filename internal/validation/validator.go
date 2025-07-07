@@ -112,7 +112,7 @@ func (v *Validator) ValidateResource(resource *parser.ParsedResource, context *V
 	errors := []ValidationError{}
 
 	// Basic YAML structure validation (already done by parser)
-	
+
 	// Naming convention validation
 	if v.namingValidator != nil && v.isValidatorEnabled("naming") {
 		namingErrors := v.namingValidator.ValidateResourceName(resource.Resource, context)
@@ -158,11 +158,11 @@ func (v *Validator) isValidatorEnabled(validatorType string) bool {
 
 // ValidationResult holds the results of validation
 type ValidationResult struct {
-	TotalResources  int
-	ValidResources  int
-	Errors          []ValidationError
-	Warnings        []ValidationError
-	Success         bool
+	TotalResources int
+	ValidResources int
+	Errors         []ValidationError
+	Warnings       []ValidationError
+	Success        bool
 }
 
 // PrintSummary prints a summary of validation results
@@ -170,7 +170,7 @@ func (r *ValidationResult) PrintSummary() {
 	if r.Success {
 		fmt.Printf("✅ All resources are valid!\n")
 		fmt.Printf("   └─ %d resources passed validation\n\n", r.ValidResources)
-		
+
 		if len(r.Warnings) > 0 {
 			fmt.Printf("⚠️  %d warnings:\n", len(r.Warnings))
 			for i, warning := range r.Warnings {
@@ -198,11 +198,11 @@ func (r *ValidationResult) PrintSummary() {
 		fmt.Printf("✅ %d resources passed validation\n", r.ValidResources)
 	}
 	fmt.Printf("❌ %d validation errors found\n", len(r.Errors))
-	
+
 	if len(r.Warnings) > 0 {
 		fmt.Printf("⚠️  %d warnings found\n", len(r.Warnings))
 	}
-	
+
 	fmt.Printf("\n")
 }
 

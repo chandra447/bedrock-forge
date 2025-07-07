@@ -1,19 +1,19 @@
 package models
 
 type Guardrail struct {
-	Kind     ResourceKind   `yaml:"kind"`
-	Metadata Metadata       `yaml:"metadata"`
-	Spec     GuardrailSpec  `yaml:"spec"`
+	Kind     ResourceKind  `yaml:"kind"`
+	Metadata Metadata      `yaml:"metadata"`
+	Spec     GuardrailSpec `yaml:"spec"`
 }
 
 type GuardrailSpec struct {
-	Description                          string                                `yaml:"description,omitempty"`
-	ContentPolicyConfig                  *ContentPolicyConfig                  `yaml:"contentPolicyConfig,omitempty"`
-	SensitiveInformationPolicyConfig     *SensitiveInformationPolicyConfig     `yaml:"sensitiveInformationPolicyConfig,omitempty"`
-	ContextualGroundingPolicyConfig      *ContextualGroundingPolicyConfig      `yaml:"contextualGroundingPolicyConfig,omitempty"`
-	TopicPolicyConfig                    *TopicPolicyConfig                    `yaml:"topicPolicyConfig,omitempty"`
-	WordPolicyConfig                     *WordPolicyConfig                     `yaml:"wordPolicyConfig,omitempty"`
-	Tags                                 map[string]string                     `yaml:"tags,omitempty"`
+	Description                      string                            `yaml:"description,omitempty"`
+	ContentPolicyConfig              *ContentPolicyConfig              `yaml:"contentPolicyConfig,omitempty"`
+	SensitiveInformationPolicyConfig *SensitiveInformationPolicyConfig `yaml:"sensitiveInformationPolicyConfig,omitempty"`
+	ContextualGroundingPolicyConfig  *ContextualGroundingPolicyConfig  `yaml:"contextualGroundingPolicyConfig,omitempty"`
+	TopicPolicyConfig                *TopicPolicyConfig                `yaml:"topicPolicyConfig,omitempty"`
+	WordPolicyConfig                 *WordPolicyConfig                 `yaml:"wordPolicyConfig,omitempty"`
+	Tags                             map[string]string                 `yaml:"tags,omitempty"`
 }
 
 type ContentPolicyConfig struct {
@@ -56,8 +56,8 @@ type Topic struct {
 }
 
 type WordPolicyConfig struct {
-	WordsConfig              []Word                    `yaml:"wordsConfig,omitempty"`
-	ManagedWordListsConfig   []ManagedWordList         `yaml:"managedWordListsConfig,omitempty"`
+	WordsConfig            []Word            `yaml:"wordsConfig,omitempty"`
+	ManagedWordListsConfig []ManagedWordList `yaml:"managedWordListsConfig,omitempty"`
 }
 
 type Word struct {

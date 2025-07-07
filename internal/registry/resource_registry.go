@@ -136,7 +136,7 @@ func (r *ResourceRegistry) ValidateDependencies() []error {
 	agents := r.resources[models.AgentKind]
 	for _, agentResource := range agents {
 		agent := agentResource.Resource.(*models.Agent)
-		
+
 		if agent.Spec.Guardrail != nil {
 			guardrailName := agent.Spec.Guardrail.Name
 			if _, exists := r.resources[models.GuardrailKind][guardrailName]; !exists {
@@ -171,7 +171,7 @@ func (r *ResourceRegistry) ValidateDependencies() []error {
 	actionGroups := r.resources[models.ActionGroupKind]
 	for _, agResource := range actionGroups {
 		actionGroup := agResource.Resource.(*models.ActionGroup)
-		
+
 		if actionGroup.Spec.ActionGroupExecutor != nil {
 			// If lambdaArn is specified, no dependency validation needed (external Lambda)
 			if actionGroup.Spec.ActionGroupExecutor.LambdaArn != "" {
@@ -181,7 +181,7 @@ func (r *ResourceRegistry) ValidateDependencies() []error {
 				}).Debug("Action group uses external Lambda ARN, skipping dependency validation")
 				continue
 			}
-			
+
 			// If lambda name is specified, validate it exists in the registry
 			if actionGroup.Spec.ActionGroupExecutor.Lambda != "" {
 				lambdaName := actionGroup.Spec.ActionGroupExecutor.Lambda
@@ -196,7 +196,7 @@ func (r *ResourceRegistry) ValidateDependencies() []error {
 	customModules := r.resources[models.CustomModuleKind]
 	for _, cmResource := range customModules {
 		customModule := cmResource.Resource.(*models.CustomModule)
-		
+
 		// Validate dependsOn references
 		for _, dep := range customModule.Spec.DependsOn {
 			found := false
@@ -212,14 +212,14 @@ func (r *ResourceRegistry) ValidateDependencies() []error {
 				models.CustomModuleKind,
 				models.OpenSearchServerlessKind,
 			}
-			
+
 			for _, resourceType := range resourceTypes {
 				if _, exists := r.resources[resourceType][dep]; exists {
 					found = true
 					break
 				}
 			}
-			
+
 			if !found {
 				errors = append(errors, fmt.Errorf("custom module %s references non-existent dependency %s", customModule.Metadata.Name, dep))
 			}
@@ -293,7 +293,7 @@ func (r *ResourceRegistry) GetResourcesByType(kind models.ResourceKind) []models
 					spec = opensearchServerless.Spec
 				}
 			}
-			
+
 			result = append(result, models.BaseResource{
 				Kind:     resource.Kind,
 				Metadata: resource.Metadata,

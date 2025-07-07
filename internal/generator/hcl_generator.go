@@ -9,8 +9,8 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/hashicorp/hcl/v2/hclwrite"
-	"github.com/zclconf/go-cty/cty"
 	"github.com/sirupsen/logrus"
+	"github.com/zclconf/go-cty/cty"
 
 	"bedrock-forge/internal/models"
 	"bedrock-forge/internal/registry"
@@ -104,10 +104,10 @@ func (g *HCLGenerator) buildDependencyOrder() ([]models.ResourceKind, error) {
 	// KnowledgeBases and Lambdas can be created next
 	// ActionGroups depend on Lambdas
 	// Agents depend on everything else
-	
+
 	order := []models.ResourceKind{
-		models.IAMRoleKind,         // IAM roles must be created first
-		models.CustomModuleKind,    // Custom modules can be created early
+		models.IAMRoleKind,      // IAM roles must be created first
+		models.CustomModuleKind, // Custom modules can be created early
 		models.GuardrailKind,
 		models.PromptKind,
 		models.LambdaKind,
@@ -150,19 +150,19 @@ func (g *HCLGenerator) generateModuleCall(body *hclwrite.Body, resource models.B
 func (g *HCLGenerator) addTerraformBlock(body *hclwrite.Body) {
 	terraformBlock := body.AppendNewBlock("terraform", nil)
 	terraformBody := terraformBlock.Body()
-	
+
 	// Add required providers
 	reqProvidersBlock := terraformBody.AppendNewBlock("required_providers", nil)
 	reqProvidersBody := reqProvidersBlock.Body()
-	
+
 	reqProvidersBody.SetAttributeValue("aws", cty.ObjectVal(map[string]cty.Value{
 		"source":  cty.StringVal("hashicorp/aws"),
 		"version": cty.StringVal("~> 5.0"),
 	}))
-	
+
 	// Add required version
 	terraformBody.SetAttributeValue("required_version", cty.StringVal(">= 1.0"))
-	
+
 	body.AppendNewline()
 }
 
@@ -170,17 +170,17 @@ func (g *HCLGenerator) addTerraformBlock(body *hclwrite.Body) {
 func (g *HCLGenerator) addProviderBlock(body *hclwrite.Body) {
 	providerBlock := body.AppendNewBlock("provider", []string{"aws"})
 	providerBody := providerBlock.Body()
-	
+
 	// Add default tags as a block
 	defaultTagsBlock := providerBody.AppendNewBlock("default_tags", nil)
 	defaultTagsBody := defaultTagsBlock.Body()
-	
+
 	defaultTagsBody.SetAttributeValue("tags", cty.ObjectVal(map[string]cty.Value{
 		"Project":     cty.StringVal(g.config.ProjectName),
 		"Environment": cty.StringVal(g.config.Environment),
 		"ManagedBy":   cty.StringVal("bedrock-forge"),
 	}))
-	
+
 	body.AppendNewline()
 }
 
@@ -194,7 +194,7 @@ func (g *HCLGenerator) addVariablesBlock(body *hclwrite.Body) {
 		{Type: hclsyntax.TokenIdent, Bytes: []byte("string")},
 	})
 	projVarBody.SetAttributeValue("default", cty.StringVal(g.config.ProjectName))
-	
+
 	// Add environment variable
 	envVarBlock := body.AppendNewBlock("variable", []string{"environment"})
 	envVarBody := envVarBlock.Body()
@@ -203,7 +203,7 @@ func (g *HCLGenerator) addVariablesBlock(body *hclwrite.Body) {
 		{Type: hclsyntax.TokenIdent, Bytes: []byte("string")},
 	})
 	envVarBody.SetAttributeValue("default", cty.StringVal(g.config.Environment))
-	
+
 	body.AppendNewline()
 }
 
@@ -213,7 +213,7 @@ func (g *HCLGenerator) addOutputsBlock(body *hclwrite.Body) {
 	agents := g.registry.GetResourcesByType(models.AgentKind)
 	for _, agent := range agents {
 		agentName := g.sanitizeResourceName(agent.Metadata.Name)
-		
+
 		// Agent ID output
 		agentIdBlock := body.AppendNewBlock("output", []string{fmt.Sprintf("%s_agent_id", agentName)})
 		agentIdBody := agentIdBlock.Body()
@@ -223,7 +223,7 @@ func (g *HCLGenerator) addOutputsBlock(body *hclwrite.Body) {
 			hcl.TraverseAttr{Name: agentName},
 			hcl.TraverseAttr{Name: "agent_id"},
 		})
-		
+
 		// Agent ARN output
 		agentArnBlock := body.AppendNewBlock("output", []string{fmt.Sprintf("%s_agent_arn", agentName)})
 		agentArnBody := agentArnBlock.Body()
@@ -234,7 +234,7 @@ func (g *HCLGenerator) addOutputsBlock(body *hclwrite.Body) {
 			hcl.TraverseAttr{Name: "agent_arn"},
 		})
 	}
-	
+
 	body.AppendNewline()
 }
 
@@ -243,22 +243,22 @@ func (g *HCLGenerator) sanitizeResourceName(name string) string {
 	// Replace hyphens and spaces with underscores
 	sanitized := strings.ReplaceAll(name, "-", "_")
 	sanitized = strings.ReplaceAll(sanitized, " ", "_")
-	
+
 	// Convert to lowercase
 	sanitized = strings.ToLower(sanitized)
-	
+
 	return sanitized
 }
 
 // writeHCLFile writes the HCL file to disk
 func (g *HCLGenerator) writeHCLFile(path string, file *hclwrite.File) error {
 	content := file.Bytes()
-	
+
 	// Create directory if it doesn't exist
 	if err := g.ensureDir(filepath.Dir(path)); err != nil {
 		return err
 	}
-	
+
 	return g.writeFile(path, content)
 }
 
@@ -275,7 +275,7 @@ func (g *HCLGenerator) writeFile(path string, content []byte) error {
 // generateAutoIAMRoles generates IAM roles for all agents automatically
 func (g *HCLGenerator) generateAutoIAMRoles(body *hclwrite.Body) {
 	agents := g.registry.GetResourcesByType(models.AgentKind)
-	
+
 	for _, agentResource := range agents {
 		// Generate IAM role for every agent
 		if err := g.generateAutoIAMRole(body, agentResource.Metadata.Name, nil); err != nil {
@@ -283,4 +283,3 @@ func (g *HCLGenerator) generateAutoIAMRoles(body *hclwrite.Body) {
 		}
 	}
 }
-

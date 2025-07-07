@@ -1,8 +1,8 @@
 package generator
 
 import (
-	"fmt"
 	"encoding/json"
+	"fmt"
 
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/zclconf/go-cty/cty"
@@ -19,26 +19,26 @@ func (g *HCLGenerator) generateCustomModuleModule(body *hclwrite.Body, resource 
 		if !mapOk {
 			return fmt.Errorf("invalid custom module spec format")
 		}
-		
+
 		// Convert map to CustomModuleSpec
 		specJSON, err := json.Marshal(specMap)
 		if err != nil {
 			return fmt.Errorf("failed to marshal custom module spec: %w", err)
 		}
-		
+
 		if err := json.Unmarshal(specJSON, &customModule); err != nil {
 			return fmt.Errorf("failed to unmarshal custom module spec: %w", err)
 		}
 	}
 
 	resourceName := g.sanitizeResourceName(resource.Metadata.Name)
-	
+
 	g.logger.WithField("custom_module", resource.Metadata.Name).Debug("Generating custom module")
 
 	// Create module block
 	moduleBlock := body.AppendNewBlock("module", []string{resourceName})
 	moduleBody := moduleBlock.Body()
-	
+
 	// Set module source
 	moduleSource := customModule.Source
 	if customModule.Version != "" {
@@ -51,7 +51,7 @@ func (g *HCLGenerator) generateCustomModuleModule(body *hclwrite.Body, resource 
 		}
 	}
 	moduleBody.SetAttributeValue("source", cty.StringVal(moduleSource))
-	
+
 	// Set input variables
 	if len(customModule.Variables) > 0 {
 		for varName, varValue := range customModule.Variables {
@@ -63,7 +63,7 @@ func (g *HCLGenerator) generateCustomModuleModule(body *hclwrite.Body, resource 
 			moduleBody.SetAttributeValue(varName, ctyValue)
 		}
 	}
-	
+
 	// Add dependency references if specified
 	if len(customModule.DependsOn) > 0 {
 		dependsList := make([]cty.Value, 0, len(customModule.DependsOn))
@@ -80,9 +80,9 @@ func (g *HCLGenerator) generateCustomModuleModule(body *hclwrite.Body, resource 
 			moduleBody.SetAttributeValue("depends_on", cty.ListVal(dependsList))
 		}
 	}
-	
+
 	body.AppendNewline()
-	
+
 	g.logger.WithField("custom_module", resource.Metadata.Name).Info("Generated custom module")
 	return nil
 }
@@ -128,7 +128,7 @@ func convertToCtyValue(value interface{}) (cty.Value, error) {
 
 // isGitSource checks if the source is a git repository
 func isGitSource(source string) bool {
-	return len(source) > 4 && (source[:4] == "git:" || 
+	return len(source) > 4 && (source[:4] == "git:" ||
 		source[:8] == "https://" && (source[8:] == "github.com" || source[8:] == "gitlab.com"))
 }
 
@@ -158,7 +158,7 @@ func (g *HCLGenerator) isValidDependency(dep string) bool {
 		models.IAMRoleKind,
 		models.CustomModuleKind,
 	}
-	
+
 	for _, resourceType := range resourceTypes {
 		if g.registry.HasResource(resourceType, dep) {
 			return true

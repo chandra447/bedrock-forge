@@ -7,16 +7,16 @@ type Agent struct {
 }
 
 type AgentSpec struct {
-	FoundationModel         string                    `yaml:"foundationModel"`
-	Instruction             string                    `yaml:"instruction"`
-	Description             string                    `yaml:"description,omitempty"`
-	IdleSessionTTL          int                       `yaml:"idleSessionTtl,omitempty"`
-	CustomerEncryptionKey   string                    `yaml:"customerEncryptionKey,omitempty"`
-	Tags                    map[string]string         `yaml:"tags,omitempty"`
-	Guardrail               *GuardrailConfig          `yaml:"guardrail,omitempty"`
-	ActionGroups            []InlineActionGroup       `yaml:"actionGroups,omitempty"`
-	PromptOverrides         []PromptOverride          `yaml:"promptOverrides,omitempty"`
-	MemoryConfiguration     *MemoryConfiguration      `yaml:"memoryConfiguration,omitempty"`
+	FoundationModel       string               `yaml:"foundationModel"`
+	Instruction           string               `yaml:"instruction"`
+	Description           string               `yaml:"description,omitempty"`
+	IdleSessionTTL        int                  `yaml:"idleSessionTtl,omitempty"`
+	CustomerEncryptionKey string               `yaml:"customerEncryptionKey,omitempty"`
+	Tags                  map[string]string    `yaml:"tags,omitempty"`
+	Guardrail             *GuardrailConfig     `yaml:"guardrail,omitempty"`
+	ActionGroups          []InlineActionGroup  `yaml:"actionGroups,omitempty"`
+	PromptOverrides       []PromptOverride     `yaml:"promptOverrides,omitempty"`
+	MemoryConfiguration   *MemoryConfiguration `yaml:"memoryConfiguration,omitempty"`
 }
 
 type GuardrailConfig struct {
@@ -27,22 +27,22 @@ type GuardrailConfig struct {
 
 // InlineActionGroup represents an action group defined directly within an agent
 type InlineActionGroup struct {
-	Name                      string                     `yaml:"name"`
-	Description               string                     `yaml:"description,omitempty"`
-	ParentActionGroupSignature string                     `yaml:"parentActionGroupSignature,omitempty"`
-	ActionGroupExecutor       *ActionGroupExecutor       `yaml:"actionGroupExecutor,omitempty"`
-	ActionGroupState          string                     `yaml:"actionGroupState,omitempty"`
-	APISchema                 *APISchema                 `yaml:"apiSchema,omitempty"`
-	FunctionSchema            *FunctionSchema            `yaml:"functionSchema,omitempty"`
-	SkipResourceInUseCheck    bool                       `yaml:"skipResourceInUseCheck,omitempty"`
+	Name                       string               `yaml:"name"`
+	Description                string               `yaml:"description,omitempty"`
+	ParentActionGroupSignature string               `yaml:"parentActionGroupSignature,omitempty"`
+	ActionGroupExecutor        *ActionGroupExecutor `yaml:"actionGroupExecutor,omitempty"`
+	ActionGroupState           string               `yaml:"actionGroupState,omitempty"`
+	APISchema                  *APISchema           `yaml:"apiSchema,omitempty"`
+	FunctionSchema             *FunctionSchema      `yaml:"functionSchema,omitempty"`
+	SkipResourceInUseCheck     bool                 `yaml:"skipResourceInUseCheck,omitempty"`
 }
 
 type PromptOverride struct {
-	PromptType     string `yaml:"promptType"`
-	PromptArn      string `yaml:"promptArn,omitempty"`
-	Prompt         string `yaml:"prompt,omitempty"`
-	PromptVariant  string `yaml:"promptVariant,omitempty"`
-	Variant        string `yaml:"variant,omitempty"`
+	PromptType    string `yaml:"promptType"`
+	PromptArn     string `yaml:"promptArn,omitempty"`
+	Prompt        string `yaml:"prompt,omitempty"`
+	PromptVariant string `yaml:"promptVariant,omitempty"`
+	Variant       string `yaml:"variant,omitempty"`
 }
 
 type MemoryConfiguration struct {

@@ -19,10 +19,10 @@ type LambdaSpec struct {
 }
 
 type CodeConfiguration struct {
-	Source         string `yaml:"source"`
-	ZipFile        string `yaml:"zipFile,omitempty"`
-	S3Bucket       string `yaml:"s3Bucket,omitempty"`
-	S3Key          string `yaml:"s3Key,omitempty"`
+	Source          string `yaml:"source"`
+	ZipFile         string `yaml:"zipFile,omitempty"`
+	S3Bucket        string `yaml:"s3Bucket,omitempty"`
+	S3Key           string `yaml:"s3Key,omitempty"`
 	S3ObjectVersion string `yaml:"s3ObjectVersion,omitempty"`
 }
 

@@ -12,19 +12,19 @@ import (
 type SecurityPolicyConfig struct {
 	// IAM policy validation rules
 	IAMPolicies *IAMPolicyValidation `yaml:"iamPolicies,omitempty"`
-	
+
 	// Lambda security requirements
 	LambdaSecurity *LambdaSecurityValidation `yaml:"lambdaSecurity,omitempty"`
-	
+
 	// Agent security requirements
 	AgentSecurity *AgentSecurityValidation `yaml:"agentSecurity,omitempty"`
-	
+
 	// Knowledge base security requirements
 	KnowledgeBaseSecurity *KnowledgeBaseSecurityValidation `yaml:"knowledgeBaseSecurity,omitempty"`
-	
+
 	// Encryption requirements
 	EncryptionRequirements *EncryptionValidation `yaml:"encryptionRequirements,omitempty"`
-	
+
 	// Network security requirements
 	NetworkSecurity *NetworkSecurityValidation `yaml:"networkSecurity,omitempty"`
 }
@@ -33,25 +33,25 @@ type SecurityPolicyConfig struct {
 type IAMPolicyValidation struct {
 	// Forbidden actions that should never be allowed
 	ForbiddenActions []string `yaml:"forbiddenActions,omitempty"`
-	
+
 	// Required actions for specific resource types
 	RequiredActions map[string][]string `yaml:"requiredActions,omitempty"`
-	
+
 	// Forbidden resources patterns
 	ForbiddenResources []string `yaml:"forbiddenResources,omitempty"`
-	
+
 	// Maximum policy size
 	MaxPolicySize int `yaml:"maxPolicySize,omitempty"`
-	
+
 	// Whether wildcard resources are allowed
 	AllowWildcardResources bool `yaml:"allowWildcardResources,omitempty"`
-	
+
 	// Whether admin permissions are allowed
 	AllowAdminPermissions bool `yaml:"allowAdminPermissions,omitempty"`
-	
+
 	// Require MFA for sensitive actions
 	RequireMFAForSensitiveActions bool `yaml:"requireMFAForSensitiveActions,omitempty"`
-	
+
 	// Sensitive actions that require additional controls
 	SensitiveActions []string `yaml:"sensitiveActions,omitempty"`
 }
@@ -60,22 +60,22 @@ type IAMPolicyValidation struct {
 type LambdaSecurityValidation struct {
 	// Require VPC configuration for Lambda functions
 	RequireVPC bool `yaml:"requireVPC,omitempty"`
-	
+
 	// Forbidden environment variable patterns
 	ForbiddenEnvPatterns []string `yaml:"forbiddenEnvPatterns,omitempty"`
-	
+
 	// Required security headers for HTTP-triggered functions
 	RequiredSecurityHeaders []string `yaml:"requiredSecurityHeaders,omitempty"`
-	
+
 	// Maximum execution timeout
 	MaxTimeout int `yaml:"maxTimeout,omitempty"`
-	
+
 	// Maximum memory allocation
 	MaxMemorySize int `yaml:"maxMemorySize,omitempty"`
-	
+
 	// Allowed runtimes
 	AllowedRuntimes []string `yaml:"allowedRuntimes,omitempty"`
-	
+
 	// Require encryption for environment variables
 	RequireEnvEncryption bool `yaml:"requireEnvEncryption,omitempty"`
 }
@@ -84,19 +84,19 @@ type LambdaSecurityValidation struct {
 type AgentSecurityValidation struct {
 	// Require guardrails for all agents
 	RequireGuardrails bool `yaml:"requireGuardrails,omitempty"`
-	
+
 	// Required guardrail configurations
 	RequiredGuardrailTypes []string `yaml:"requiredGuardrailTypes,omitempty"`
-	
+
 	// Maximum idle session timeout
 	MaxIdleSessionTTL int `yaml:"maxIdleSessionTTL,omitempty"`
-	
+
 	// Require customer encryption key
 	RequireCustomerEncryption bool `yaml:"requireCustomerEncryption,omitempty"`
-	
+
 	// Forbidden foundation models
 	ForbiddenModels []string `yaml:"forbiddenModels,omitempty"`
-	
+
 	// Required memory configuration
 	RequireMemoryConfiguration bool `yaml:"requireMemoryConfiguration,omitempty"`
 }
@@ -105,16 +105,16 @@ type AgentSecurityValidation struct {
 type KnowledgeBaseSecurityValidation struct {
 	// Require encryption for data sources
 	RequireDataSourceEncryption bool `yaml:"requireDataSourceEncryption,omitempty"`
-	
+
 	// Allowed data source types
 	AllowedDataSourceTypes []string `yaml:"allowedDataSourceTypes,omitempty"`
-	
+
 	// Require VPC endpoints for data access
 	RequireVPCEndpoints bool `yaml:"requireVPCEndpoints,omitempty"`
-	
+
 	// Maximum document retention period
 	MaxRetentionDays int `yaml:"maxRetentionDays,omitempty"`
-	
+
 	// Require data source access logging
 	RequireAccessLogging bool `yaml:"requireAccessLogging,omitempty"`
 }
@@ -123,13 +123,13 @@ type KnowledgeBaseSecurityValidation struct {
 type EncryptionValidation struct {
 	// Require encryption at rest
 	RequireEncryptionAtRest bool `yaml:"requireEncryptionAtRest,omitempty"`
-	
+
 	// Require encryption in transit
 	RequireEncryptionInTransit bool `yaml:"requireEncryptionInTransit,omitempty"`
-	
+
 	// Allowed KMS key patterns
 	AllowedKMSKeyPatterns []string `yaml:"allowedKMSKeyPatterns,omitempty"`
-	
+
 	// Require customer-managed keys
 	RequireCustomerManagedKeys bool `yaml:"requireCustomerManagedKeys,omitempty"`
 }
@@ -138,13 +138,13 @@ type EncryptionValidation struct {
 type NetworkSecurityValidation struct {
 	// Require private subnets for sensitive resources
 	RequirePrivateSubnets bool `yaml:"requirePrivateSubnets,omitempty"`
-	
+
 	// Allowed security group patterns
 	AllowedSecurityGroups []string `yaml:"allowedSecurityGroups,omitempty"`
-	
+
 	// Forbidden port ranges
 	ForbiddenPorts []string `yaml:"forbiddenPorts,omitempty"`
-	
+
 	// Require VPC flow logs
 	RequireVPCFlowLogs bool `yaml:"requireVPCFlowLogs,omitempty"`
 }
@@ -164,7 +164,7 @@ func NewSecurityValidator(config *SecurityPolicyConfig) (*SecurityValidator, err
 // ValidateResourceSecurity validates a resource against security policies
 func (v *SecurityValidator) ValidateResourceSecurity(resource interface{}, context *ValidationContext) []ValidationError {
 	errors := []ValidationError{}
-	
+
 	switch r := resource.(type) {
 	case *models.Agent:
 		errors = append(errors, v.validateAgentSecurity(r)...)
@@ -175,21 +175,21 @@ func (v *SecurityValidator) ValidateResourceSecurity(resource interface{}, conte
 	case *models.IAMRole:
 		errors = append(errors, v.validateIAMRoleSecurity(r)...)
 	}
-	
+
 	return errors
 }
 
 // validateAgentSecurity validates Bedrock agent security requirements
 func (v *SecurityValidator) validateAgentSecurity(agent *models.Agent) []ValidationError {
 	errors := []ValidationError{}
-	
+
 	if v.config.AgentSecurity == nil {
 		return errors
 	}
-	
+
 	config := v.config.AgentSecurity
 	resourceName := fmt.Sprintf("Agent/%s", agent.Metadata.Name)
-	
+
 	// Check if guardrails are required
 	if config.RequireGuardrails && agent.Spec.Guardrail == nil {
 		errors = append(errors, ValidationError{
@@ -200,7 +200,7 @@ func (v *SecurityValidator) validateAgentSecurity(agent *models.Agent) []Validat
 			Severity: "error",
 		})
 	}
-	
+
 	// Check idle session timeout
 	if config.MaxIdleSessionTTL > 0 && agent.Spec.IdleSessionTTL > config.MaxIdleSessionTTL {
 		errors = append(errors, ValidationError{
@@ -211,7 +211,7 @@ func (v *SecurityValidator) validateAgentSecurity(agent *models.Agent) []Validat
 			Severity: "error",
 		})
 	}
-	
+
 	// Check customer encryption requirement
 	if config.RequireCustomerEncryption && agent.Spec.CustomerEncryptionKey == "" {
 		errors = append(errors, ValidationError{
@@ -222,7 +222,7 @@ func (v *SecurityValidator) validateAgentSecurity(agent *models.Agent) []Validat
 			Severity: "error",
 		})
 	}
-	
+
 	// Check forbidden models
 	for _, forbiddenModel := range config.ForbiddenModels {
 		if strings.Contains(agent.Spec.FoundationModel, forbiddenModel) {
@@ -235,7 +235,7 @@ func (v *SecurityValidator) validateAgentSecurity(agent *models.Agent) []Validat
 			})
 		}
 	}
-	
+
 	// Check memory configuration requirement
 	if config.RequireMemoryConfiguration && agent.Spec.MemoryConfiguration == nil {
 		errors = append(errors, ValidationError{
@@ -246,21 +246,21 @@ func (v *SecurityValidator) validateAgentSecurity(agent *models.Agent) []Validat
 			Severity: "error",
 		})
 	}
-	
+
 	return errors
 }
 
 // validateLambdaSecurity validates Lambda function security requirements
 func (v *SecurityValidator) validateLambdaSecurity(lambda *models.Lambda) []ValidationError {
 	errors := []ValidationError{}
-	
+
 	if v.config.LambdaSecurity == nil {
 		return errors
 	}
-	
+
 	config := v.config.LambdaSecurity
 	resourceName := fmt.Sprintf("Lambda/%s", lambda.Metadata.Name)
-	
+
 	// Check VPC requirement
 	if config.RequireVPC && lambda.Spec.VpcConfig == nil {
 		errors = append(errors, ValidationError{
@@ -271,7 +271,7 @@ func (v *SecurityValidator) validateLambdaSecurity(lambda *models.Lambda) []Vali
 			Severity: "error",
 		})
 	}
-	
+
 	// Check timeout limits
 	if config.MaxTimeout > 0 && lambda.Spec.Timeout > config.MaxTimeout {
 		errors = append(errors, ValidationError{
@@ -282,7 +282,7 @@ func (v *SecurityValidator) validateLambdaSecurity(lambda *models.Lambda) []Vali
 			Severity: "error",
 		})
 	}
-	
+
 	// Check memory limits
 	if config.MaxMemorySize > 0 && lambda.Spec.MemorySize > config.MaxMemorySize {
 		errors = append(errors, ValidationError{
@@ -293,7 +293,7 @@ func (v *SecurityValidator) validateLambdaSecurity(lambda *models.Lambda) []Vali
 			Severity: "error",
 		})
 	}
-	
+
 	// Check allowed runtimes
 	if len(config.AllowedRuntimes) > 0 {
 		runtimeAllowed := false
@@ -313,7 +313,7 @@ func (v *SecurityValidator) validateLambdaSecurity(lambda *models.Lambda) []Vali
 			})
 		}
 	}
-	
+
 	// Check environment variable patterns
 	for envName, envValue := range lambda.Spec.Environment {
 		for _, forbiddenPattern := range config.ForbiddenEnvPatterns {
@@ -337,21 +337,21 @@ func (v *SecurityValidator) validateLambdaSecurity(lambda *models.Lambda) []Vali
 			}
 		}
 	}
-	
+
 	return errors
 }
 
 // validateKnowledgeBaseSecurity validates knowledge base security requirements
 func (v *SecurityValidator) validateKnowledgeBaseSecurity(kb *models.KnowledgeBase) []ValidationError {
 	errors := []ValidationError{}
-	
+
 	if v.config.KnowledgeBaseSecurity == nil {
 		return errors
 	}
-	
+
 	config := v.config.KnowledgeBaseSecurity
 	resourceName := fmt.Sprintf("KnowledgeBase/%s", kb.Metadata.Name)
-	
+
 	// Check allowed data source types
 	if len(config.AllowedDataSourceTypes) > 0 {
 		for _, dataSource := range kb.Spec.DataSources {
@@ -373,26 +373,26 @@ func (v *SecurityValidator) validateKnowledgeBaseSecurity(kb *models.KnowledgeBa
 			}
 		}
 	}
-	
+
 	return errors
 }
 
 // validateIAMRoleSecurity validates IAM role security requirements
 func (v *SecurityValidator) validateIAMRoleSecurity(role *models.IAMRole) []ValidationError {
 	errors := []ValidationError{}
-	
+
 	if v.config.IAMPolicies == nil {
 		return errors
 	}
-	
+
 	resourceName := fmt.Sprintf("IAMRole/%s", role.Metadata.Name)
-	
+
 	// Validate inline policies
 	for _, inlinePolicy := range role.Spec.InlinePolicies {
 		policyErrors := v.validateIAMPolicyDocument(&inlinePolicy.Policy, resourceName, fmt.Sprintf("spec.inlinePolicies[%s]", inlinePolicy.Name))
 		errors = append(errors, policyErrors...)
 	}
-	
+
 	return errors
 }
 
@@ -400,10 +400,10 @@ func (v *SecurityValidator) validateIAMRoleSecurity(role *models.IAMRole) []Vali
 func (v *SecurityValidator) validateIAMPolicyDocument(policy *models.IAMPolicyDocument, resourceName, fieldPath string) []ValidationError {
 	errors := []ValidationError{}
 	config := v.config.IAMPolicies
-	
+
 	for i, statement := range policy.Statement {
 		statementPath := fmt.Sprintf("%s.statement[%d]", fieldPath, i)
-		
+
 		// Check for forbidden actions
 		actions := v.normalizeActions(statement.Action)
 		for _, action := range actions {
@@ -419,7 +419,7 @@ func (v *SecurityValidator) validateIAMPolicyDocument(policy *models.IAMPolicyDo
 				}
 			}
 		}
-		
+
 		// Check for admin permissions
 		if !config.AllowAdminPermissions {
 			for _, action := range actions {
@@ -434,7 +434,7 @@ func (v *SecurityValidator) validateIAMPolicyDocument(policy *models.IAMPolicyDo
 				}
 			}
 		}
-		
+
 		// Check for wildcard resources
 		if !config.AllowWildcardResources {
 			resources := v.normalizeResources(statement.Resource)
@@ -450,7 +450,7 @@ func (v *SecurityValidator) validateIAMPolicyDocument(policy *models.IAMPolicyDo
 				}
 			}
 		}
-		
+
 		// Check for sensitive actions requiring MFA
 		if config.RequireMFAForSensitiveActions && statement.Effect == "Allow" {
 			for _, action := range actions {
@@ -471,7 +471,7 @@ func (v *SecurityValidator) validateIAMPolicyDocument(policy *models.IAMPolicyDo
 			}
 		}
 	}
-	
+
 	return errors
 }
 
@@ -520,13 +520,13 @@ func (v *SecurityValidator) hasMFACondition(condition map[string]interface{}) bo
 	if condition == nil {
 		return false
 	}
-	
+
 	// Check for common MFA condition patterns
 	mfaPatterns := []string{
 		"aws:MultiFactorAuthPresent",
 		"aws:MultiFactorAuthAge",
 	}
-	
+
 	for key := range condition {
 		for _, pattern := range mfaPatterns {
 			if strings.Contains(key, pattern) {
@@ -534,7 +534,7 @@ func (v *SecurityValidator) hasMFACondition(condition map[string]interface{}) bo
 			}
 		}
 	}
-	
+
 	return false
 }
 
@@ -570,9 +570,9 @@ func DefaultSecurityPolicies() *SecurityPolicyConfig {
 			},
 		},
 		AgentSecurity: &AgentSecurityValidation{
-			RequireGuardrails:         false,
-			MaxIdleSessionTTL:         3600, // 1 hour
-			RequireCustomerEncryption: false,
+			RequireGuardrails:          false,
+			MaxIdleSessionTTL:          3600, // 1 hour
+			RequireCustomerEncryption:  false,
 			RequireMemoryConfiguration: false,
 		},
 		KnowledgeBaseSecurity: &KnowledgeBaseSecurityValidation{
@@ -595,9 +595,9 @@ func EnterpriseSecurityPolicies() *SecurityPolicyConfig {
 				".*:.*Admin.*",
 				".*:.*Full.*",
 			},
-			AllowWildcardResources:            false,
-			AllowAdminPermissions:             false,
-			RequireMFAForSensitiveActions:     true,
+			AllowWildcardResources:        false,
+			AllowAdminPermissions:         false,
+			RequireMFAForSensitiveActions: true,
 			SensitiveActions: []string{
 				"iam:.*",
 				"sts:AssumeRole",
@@ -622,11 +622,11 @@ func EnterpriseSecurityPolicies() *SecurityPolicyConfig {
 			},
 		},
 		AgentSecurity: &AgentSecurityValidation{
-			RequireGuardrails:           true,
-			RequiredGuardrailTypes:      []string{"CONTENT", "SENSITIVE_INFORMATION"},
-			MaxIdleSessionTTL:           1800, // 30 minutes
-			RequireCustomerEncryption:   true,
-			RequireMemoryConfiguration:  true,
+			RequireGuardrails:          true,
+			RequiredGuardrailTypes:     []string{"CONTENT", "SENSITIVE_INFORMATION"},
+			MaxIdleSessionTTL:          1800, // 30 minutes
+			RequireCustomerEncryption:  true,
+			RequireMemoryConfiguration: true,
 			ForbiddenModels: []string{
 				"anthropic.claude-instant",
 				"meta.llama2",
@@ -640,9 +640,9 @@ func EnterpriseSecurityPolicies() *SecurityPolicyConfig {
 			RequireAccessLogging:        true,
 		},
 		EncryptionRequirements: &EncryptionValidation{
-			RequireEncryptionAtRest:        true,
-			RequireEncryptionInTransit:     true,
-			RequireCustomerManagedKeys:     true,
+			RequireEncryptionAtRest:    true,
+			RequireEncryptionInTransit: true,
+			RequireCustomerManagedKeys: true,
 			AllowedKMSKeyPatterns: []string{
 				"arn:aws:kms:.*:.*:key/.*",
 			},

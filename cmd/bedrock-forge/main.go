@@ -3,8 +3,8 @@ package main
 import (
 	"os"
 
-	"github.com/spf13/cobra"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 
 	"bedrock-forge/internal/commands"
 	"bedrock-forge/pkg/config"
@@ -83,7 +83,7 @@ var versionCmd = &cobra.Command{
 
 func init() {
 	logger = config.SetupSimpleLogger()
-	
+
 	rootCmd.AddCommand(scanCmd)
 	rootCmd.AddCommand(validateCmd)
 	rootCmd.AddCommand(generateCmd)

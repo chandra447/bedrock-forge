@@ -12,10 +12,10 @@ import (
 )
 
 type ValidateCommand struct {
-	logger       *logrus.Logger
-	scanCommand  *ScanCommand
-	validator    *validation.Validator
-	configPath   string
+	logger            *logrus.Logger
+	scanCommand       *ScanCommand
+	validator         *validation.Validator
+	configPath        string
 	validationProfile string // "default", "enterprise", "custom"
 }
 
@@ -61,7 +61,7 @@ func (v *ValidateCommand) Execute(rootPath string) error {
 	}
 
 	registry := v.scanCommand.GetRegistry()
-	
+
 	fmt.Printf("\n=== Bedrock Forge Enterprise Resource Validation ===\n")
 	fmt.Printf("Profile: %s\n", v.validationProfile)
 	if v.configPath != "" {

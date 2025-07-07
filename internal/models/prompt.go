@@ -7,12 +7,12 @@ type Prompt struct {
 }
 
 type PromptSpec struct {
-	Description              string               `yaml:"description,omitempty"`
-	DefaultVariant           string               `yaml:"defaultVariant,omitempty"`
-	CustomerEncryptionKeyArn string               `yaml:"customerEncryptionKeyArn,omitempty"`
+	Description              string                `yaml:"description,omitempty"`
+	DefaultVariant           string                `yaml:"defaultVariant,omitempty"`
+	CustomerEncryptionKeyArn string                `yaml:"customerEncryptionKeyArn,omitempty"`
 	InputVariables           []PromptInputVariable `yaml:"inputVariables,omitempty"`
-	Variants                 []PromptVariant      `yaml:"variants"`
-	Tags                     map[string]string    `yaml:"tags,omitempty"`
+	Variants                 []PromptVariant       `yaml:"variants"`
+	Tags                     map[string]string     `yaml:"tags,omitempty"`
 }
 
 type PromptInputVariable struct {
@@ -30,20 +30,20 @@ type PromptVariant struct {
 type TemplateConfiguration struct {
 	// For TEXT template type
 	Text *TextTemplateConfiguration `yaml:"text,omitempty"`
-	
+
 	// For CHAT template type
 	Chat *ChatTemplateConfiguration `yaml:"chat,omitempty"`
 }
 
 type TextTemplateConfiguration struct {
-	Text          string                 `yaml:"text"`
+	Text           string                  `yaml:"text"`
 	InputVariables []TemplateInputVariable `yaml:"inputVariables,omitempty"`
 }
 
 type ChatTemplateConfiguration struct {
-	Messages          []ChatMessage          `yaml:"messages,omitempty"`
-	System            []SystemMessage        `yaml:"system,omitempty"`
-	ToolConfiguration *ToolConfiguration     `yaml:"toolConfiguration,omitempty"`
+	Messages          []ChatMessage           `yaml:"messages,omitempty"`
+	System            []SystemMessage         `yaml:"system,omitempty"`
+	ToolConfiguration *ToolConfiguration      `yaml:"toolConfiguration,omitempty"`
 	InputVariables    []TemplateInputVariable `yaml:"inputVariables,omitempty"`
 }
 
@@ -65,8 +65,8 @@ type SystemMessage struct {
 }
 
 type ToolConfiguration struct {
-	Tools           []Tool           `yaml:"tools,omitempty"`
-	ToolChoice      *ToolChoice      `yaml:"toolChoice,omitempty"`
+	Tools      []Tool      `yaml:"tools,omitempty"`
+	ToolChoice *ToolChoice `yaml:"toolChoice,omitempty"`
 }
 
 type Tool struct {
@@ -74,9 +74,9 @@ type Tool struct {
 }
 
 type ToolSpec struct {
-	Name        string                 `yaml:"name"`
-	Description string                 `yaml:"description"`
-	InputSchema *ToolInputSchema       `yaml:"inputSchema"`
+	Name        string           `yaml:"name"`
+	Description string           `yaml:"description"`
+	InputSchema *ToolInputSchema `yaml:"inputSchema"`
 }
 
 type ToolInputSchema struct {

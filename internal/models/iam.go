@@ -4,17 +4,16 @@ package models
 type IAMRoleConfig struct {
 	// For auto-generated roles
 	AutoCreate bool `yaml:"autoCreate,omitempty"`
-	
+
 	// For existing role ARN
 	RoleArn string `yaml:"roleArn,omitempty"`
-	
+
 	// For referencing a manually defined IAMRole resource
 	RoleName string `yaml:"roleName,omitempty"`
-	
+
 	// Additional policies to attach to auto-generated roles
 	AdditionalPolicies []IAMPolicyReference `yaml:"additionalPolicies,omitempty"`
 }
-
 
 type IAMRole struct {
 	Kind     ResourceKind `yaml:"kind"`
@@ -23,38 +22,38 @@ type IAMRole struct {
 }
 
 type IAMRoleSpec struct {
-	Description      string                 `yaml:"description,omitempty"`
-	AssumeRolePolicy *AssumeRolePolicy      `yaml:"assumeRolePolicy"`
-	Policies         []IAMPolicyAttachment  `yaml:"policies,omitempty"`
-	InlinePolicies   []IAMInlinePolicy      `yaml:"inlinePolicies,omitempty"`
-	Tags             map[string]string      `yaml:"tags,omitempty"`
+	Description      string                `yaml:"description,omitempty"`
+	AssumeRolePolicy *AssumeRolePolicy     `yaml:"assumeRolePolicy"`
+	Policies         []IAMPolicyAttachment `yaml:"policies,omitempty"`
+	InlinePolicies   []IAMInlinePolicy     `yaml:"inlinePolicies,omitempty"`
+	Tags             map[string]string     `yaml:"tags,omitempty"`
 }
 
 type AssumeRolePolicy struct {
-	Version   string                   `yaml:"version"`
+	Version   string                      `yaml:"version"`
 	Statement []AssumeRolePolicyStatement `yaml:"statement"`
 }
 
 type AssumeRolePolicyStatement struct {
-	Effect    string            `yaml:"effect"`
+	Effect    string                 `yaml:"effect"`
 	Principal map[string]interface{} `yaml:"principal"`
-	Action    interface{}       `yaml:"action"`
+	Action    interface{}            `yaml:"action"`
 	Condition map[string]interface{} `yaml:"condition,omitempty"`
 }
 
 type IAMPolicyAttachment struct {
-	PolicyArn string `yaml:"policyArn"`
+	PolicyArn  string `yaml:"policyArn"`
 	PolicyName string `yaml:"policyName,omitempty"`
 }
 
 type IAMInlinePolicy struct {
-	Name     string                `yaml:"name"`
-	Policy   IAMPolicyDocument     `yaml:"policy"`
+	Name   string            `yaml:"name"`
+	Policy IAMPolicyDocument `yaml:"policy"`
 }
 
 type IAMPolicyDocument struct {
-	Version   string                    `yaml:"version"`
-	Statement []IAMPolicyStatement      `yaml:"statement"`
+	Version   string               `yaml:"version"`
+	Statement []IAMPolicyStatement `yaml:"statement"`
 }
 
 type IAMPolicyStatement struct {

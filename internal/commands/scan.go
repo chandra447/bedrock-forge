@@ -13,10 +13,10 @@ import (
 )
 
 type ScanCommand struct {
-	logger   *logrus.Logger
-	scanner  *parser.Scanner
+	logger     *logrus.Logger
+	scanner    *parser.Scanner
 	yamlParser *parser.YAMLParser
-	registry *registry.ResourceRegistry
+	registry   *registry.ResourceRegistry
 }
 
 func NewScanCommand(logger *logrus.Logger) *ScanCommand {
@@ -124,7 +124,7 @@ func (s *ScanCommand) printScanResults() {
 		for name, resource := range resources {
 			relPath := s.getRelativePath(resource.FilePath)
 			fmt.Printf("   ├─ %s (%s)\n", name, relPath)
-			
+
 			if resource.Metadata.Description != "" {
 				fmt.Printf("   │  └─ %s\n", resource.Metadata.Description)
 			}
