@@ -4,7 +4,7 @@ metadata:
   description: "Chat-based AI assistant with tool calling capabilities"
 spec:
   description: "Advanced chat prompt with system messages, user/assistant messages, and tool configuration"
-  defaultVariant: "production"
+  defaultVariant: "prod"
   
   # Input variables for the entire prompt
   inputVariables:
@@ -13,7 +13,7 @@ spec:
     - name: "user_name"
   
   variants:
-    - name: "production"
+    - name: "prod"
       modelId: "anthropic.claude-3-sonnet-20240229-v1:0"
       templateType: "CHAT"
       
@@ -195,7 +195,7 @@ spec:
           maxTokens: 1024
   
   tags:
-    Environment: "production"
+    Environment: "prod"
     Team: "ai-platform"
     TemplateType: "chat"
     ToolsEnabled: "true"

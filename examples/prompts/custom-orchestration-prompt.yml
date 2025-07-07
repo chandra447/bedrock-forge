@@ -4,7 +4,7 @@ metadata:
   description: "Custom orchestration prompt for customer support"
 spec:
   description: "Custom orchestration prompt for customer support"
-  defaultVariant: "production"
+  defaultVariant: "prod"
   
   # Define input variables that can be used across all variants
   inputVariables:
@@ -12,7 +12,7 @@ spec:
     - name: "context"
   
   variants:
-    - name: "production"
+    - name: "prod"
       modelId: "anthropic.claude-3-sonnet-20240229-v1:0"
       templateType: "TEXT"
       templateConfiguration:

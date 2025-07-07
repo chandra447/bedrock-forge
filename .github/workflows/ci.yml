@@ -130,14 +130,22 @@ jobs:
           # Test basic functionality
           ./bedrock-forge version
           
-          # Test validation with examples
+          # Test validation with examples (excluding enterprise validation test)
           if [ -d "examples" ]; then
-            ./bedrock-forge validate examples/
+            # Copy examples to temp directory excluding enterprise validation test
+            cp -r examples examples-temp
+            rm -rf examples-temp/enterprise-validation-test
+            ./bedrock-forge validate examples-temp/
+            rm -rf examples-temp
           fi
           
-          # Test generation with examples
+          # Test generation with examples (excluding enterprise validation test)
           if [ -d "examples" ]; then
-            ./bedrock-forge generate examples/ ./test-output
+            # Use the same temp directory for generation
+            cp -r examples examples-temp
+            rm -rf examples-temp/enterprise-validation-test
+            ./bedrock-forge generate examples-temp/ ./test-output
+            rm -rf examples-temp
             
             # Verify Terraform files were generated
             if [ ! -f "./test-output/main.tf" ]; then
@@ -176,8 +184,8 @@ jobs:
           if [ -d "examples" ]; then
             echo "🔍 Validating examples..."
             
-            # Find all YAML files in examples
-            find examples/ -name "*.yml" -o -name "*.yaml" | while read file; do
+            # Find all YAML files in examples (excluding enterprise validation test)
+            find examples/ -path "*/enterprise-validation-test/*" -prune -o -name "*.yml" -print -o -name "*.yaml" -print | while read file; do
               echo "Validating: $file"
               
               # Extract directory for validation

@@ -67,7 +67,7 @@ spec:
           breakpointPercentileThreshold: 90
   
   tags:
-    Environment: "production"
+    Environment: "prod"
     Project: "customer-support"
     DataSource: "faq-and-manuals"
     ManagedBy: "bedrock-forge"

@@ -39,6 +39,13 @@ spec:
             "aws:SourceArn": "arn:aws:bedrock:*:123456789012:agent/*"
   
   tags:
+    # Required enterprise tags
+    Environment: "dev"
+    Project: "customer-support"
+    Owner: "team@company.com"
+    Runtime: "python3.9"
+    FunctionType: "api-integration"
+    # Legacy tags
     Function: "OrderLookup"
     Team: "CustomerSupport"
     SecurityLevel: "Enhanced"

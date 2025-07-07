@@ -13,6 +13,13 @@ spec:
   timeout: 30
   memorySize: 256
   tags:
+    # Required enterprise tags
+    Environment: "dev"
+    Project: "customer-support"
+    Owner: "team@company.com"
+    Runtime: "python3.9"
+    FunctionType: "api-integration"
+    # Legacy tags
     Function: "OrderLookup"
     Team: "CustomerSupport"
 # Note: No resource policy configuration needed! 

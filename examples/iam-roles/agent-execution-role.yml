@@ -66,4 +66,4 @@ spec:
   tags:
     Purpose: "BedrockAgentExecution"
     CreatedBy: "bedrock-forge"
-    Environment: "production"
+    Environment: "prod"

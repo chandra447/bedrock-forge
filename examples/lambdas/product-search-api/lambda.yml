@@ -13,5 +13,12 @@ spec:
   timeout: 30
   memorySize: 512
   tags:
+    # Required enterprise tags
+    Environment: "dev"
+    Project: "product-catalog"
+    Owner: "team@company.com"
+    Runtime: "python3.9"
+    FunctionType: "api-service"
+    # Legacy tags
     Function: "ProductSearch"
     Framework: "FastAPI"
