@@ -30,7 +30,7 @@ Bedrock Forge is an enterprise platform that transforms YAML configurations into
 - **KnowledgeBase**: Vector knowledge bases with embeddings and data sources
 - **OpenSearchServerless**: Auto-created OpenSearch Serverless collections with security policies for knowledge bases
 - **Guardrail**: Content safety and compliance with filters and policies
-- **Prompt**: Custom prompt templates with variants and inference configuration
+- **Prompt**: Custom prompt templates with TEXT/CHAT types, input variables, tool calling, and encryption support
 - **IAMRole**: IAM execution roles with policies and permissions
 
 **Infrastructure Integration:**
@@ -240,27 +240,130 @@ spec:
 ```
 
 ### Prompt Configuration
+
+**TEXT Template with Input Variables:**
 ```yaml
 kind: Prompt
 metadata:
-  name: "custom-orchestration-prompt"
-  description: "Custom orchestration prompt"
+  name: "customer-support-prompt"
+  description: "Customer support prompt with input variables"
 spec:
   defaultVariant: "production"
+  
+  # Define input variables that can be used in templates
+  inputVariables:
+    - name: "query"
+    - name: "context"
+    - name: "customer_name"
+  
+  # Optional: Customer encryption key for sensitive prompts
+  customerEncryptionKeyArn: "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+  
   variants:
     - name: "production"
       modelId: "anthropic.claude-3-sonnet-20240229-v1:0"
       templateType: "TEXT"
       templateConfiguration:
-        text: |
-          You are a customer support agent.
-          Customer Query: {{query}}
-          Context: {{context}}
+        text:
+          text: |
+            You are a professional customer support agent.
+            
+            Customer: {{customer_name}}
+            Query: {{query}}
+            Context: {{context}}
+            
+            Please provide a helpful response.
+          
+          # Define which variables this template uses
+          inputVariables:
+            - name: "query"
+            - name: "context"
+            - name: "customer_name"
+      
       inferenceConfiguration:
         text:
           temperature: 0.1
           topP: 0.9
+          topK: 50
           maxTokens: 2048
+          stopSequences: ["Human:", "Assistant:"]
+```
+
+**CHAT Template with Tool Calling:**
+```yaml
+kind: Prompt
+metadata:
+  name: "ai-assistant-chat"
+  description: "Chat-based AI assistant with tool calling"
+spec:
+  defaultVariant: "production"
+  
+  inputVariables:
+    - name: "user_query"
+    - name: "user_name"
+  
+  variants:
+    - name: "production"
+      modelId: "anthropic.claude-3-sonnet-20240229-v1:0"
+      templateType: "CHAT"
+      templateConfiguration:
+        chat:
+          # System messages provide instructions
+          system:
+            - text: "You are a helpful AI assistant with access to tools."
+          
+          # Conversation messages (can include variables)
+          messages:
+            - role: "user"
+              content:
+                - text: "Hello, I'm {{user_name}}. {{user_query}}"
+          
+          # Tool configuration for function calling
+          toolConfiguration:
+            tools:
+              - toolSpec:
+                  name: "search_knowledge_base"
+                  description: "Search knowledge base for information"
+                  inputSchema:
+                    json:
+                      type: "object"
+                      properties:
+                        query:
+                          type: "string"
+                          description: "Search query"
+                        category:
+                          type: "string"
+                          enum: ["products", "policies", "faq"]
+                      required: ["query"]
+              
+              - toolSpec:
+                  name: "get_order_status"
+                  description: "Get customer order status"
+                  inputSchema:
+                    json:
+                      type: "object"
+                      properties:
+                        order_id:
+                          type: "string"
+                          description: "Order ID to look up"
+                      required: ["order_id"]
+            
+            # Tool choice configuration
+            toolChoice:
+              auto: {}  # Let the model decide when to use tools
+              # any: {}   # Model must use at least one tool
+              # tool:     # Force specific tool
+              #   name: "search_knowledge_base"
+          
+          inputVariables:
+            - name: "user_query"
+            - name: "user_name"
+      
+      inferenceConfiguration:
+        text:
+          temperature: 0.2
+          topP: 0.9
+          maxTokens: 4096
 ```
 
 ### Custom Module Configuration
@@ -646,6 +749,38 @@ spec:
 - Validation ensures all referenced resources exist before generation
 - Resources are generated in proper dependency order automatically
 - Terraform module outputs handle cross-resource references seamlessly
+
+## Recent Feature Enhancements
+
+**Enhanced Prompt Resource (Latest Update):**
+
+The Prompt resource has been significantly enhanced to support all AWS Bedrock Terraform provider features:
+
+**New Capabilities:**
+- **Input Variables**: Define and use variables like `{{query}}`, `{{context}}`, `{{user_name}}` in templates
+- **CHAT Template Type**: Support for conversational templates with system messages, user/assistant exchanges
+- **Tool Calling**: Function calling capabilities with JSON schemas and tool choice strategies
+- **Customer Encryption**: KMS key support for sensitive prompt templates
+- **Enhanced Inference**: Added topK parameter, better parameter handling with pointers
+- **Template-Level Variables**: Variables can be defined globally or per-template for flexibility
+
+**Key Features:**
+1. **Dual Template Types**: TEXT (simple prompts) and CHAT (conversational with tools)
+2. **Variable Management**: Proper scope and validation for prompt variables
+3. **Function Calling**: Complete tool configuration with auto/any/specific tool choices
+4. **Security**: Optional KMS encryption for sensitive enterprise prompts
+5. **Backward Compatibility**: Existing TEXT prompts continue to work unchanged
+
+**Use Cases:**
+- **TEXT Templates**: Simple prompts with variable substitution for agent orchestration
+- **CHAT Templates**: Complex conversational agents with tool access and multi-turn dialogs
+- **Function Calling**: Agents that can call external APIs, search knowledge bases, or execute actions
+- **Enterprise Security**: Encrypted prompts for sensitive business logic and proprietary instructions
+
+**Migration Path:**
+- Existing prompts continue to work without changes
+- New features are opt-in through updated YAML structure
+- Enhanced generator handles both old and new formats seamlessly
 
 ---
 

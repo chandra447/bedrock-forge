@@ -1,0 +1,265 @@
+name: Release
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+env:
+  GO_VERSION: '1.21'
+
+jobs:
+  release-please:
+    name: Release Please
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      sha: ${{ steps.release.outputs.sha }}
+      upload_url: ${{ steps.release.outputs.upload_url }}
+    
+    steps:
+      - name: Run Release Please
+        id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          release-type: go
+          package-name: bedrock-forge
+          changelog-sections: |
+            [
+              {"type":"feat","section":"Features"},
+              {"type":"fix","section":"Bug Fixes"},
+              {"type":"docs","section":"Documentation"},
+              {"type":"deps","section":"Dependencies"},
+              {"type":"refactor","section":"Code Refactoring"},
+              {"type":"test","section":"Tests"},
+              {"type":"build","section":"Build System"},
+              {"type":"ci","section":"Continuous Integration"}
+            ]
+
+  build-and-upload:
+    name: Build and Upload Release Assets
+    runs-on: ubuntu-latest
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    
+    strategy:
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+            runner: ubuntu-latest
+          - os: linux
+            arch: arm64
+            runner: ubuntu-latest
+          - os: darwin
+            arch: amd64
+            runner: ubuntu-latest
+          - os: darwin
+            arch: arm64
+            runner: ubuntu-latest
+          - os: windows
+            arch: amd64
+            runner: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.sha }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+          CGO_ENABLED: 0
+        run: |
+          # Set binary name
+          binary_name="bedrock-forge"
+          if [ "${{ matrix.os }}" = "windows" ]; then
+            binary_name="bedrock-forge.exe"
+          fi
+          
+          # Build with version info
+          go build -ldflags "-s -w -X main.version=${{ needs.release-please.outputs.tag_name }} -X main.commit=${{ needs.release-please.outputs.sha }}" \
+            -o "${binary_name}" \
+            ./cmd/bedrock-forge
+          
+          # Create archive
+          archive_name="bedrock-forge-${{ needs.release-please.outputs.tag_name }}-${{ matrix.os }}-${{ matrix.arch }}"
+          
+          if [ "${{ matrix.os }}" = "windows" ]; then
+            zip "${archive_name}.zip" "${binary_name}" README.md LICENSE
+            echo "ASSET_PATH=${archive_name}.zip" >> $GITHUB_ENV
+            echo "ASSET_NAME=${archive_name}.zip" >> $GITHUB_ENV
+          else
+            tar -czf "${archive_name}.tar.gz" "${binary_name}" README.md LICENSE
+            echo "ASSET_PATH=${archive_name}.tar.gz" >> $GITHUB_ENV
+            echo "ASSET_NAME=${archive_name}.tar.gz" >> $GITHUB_ENV
+          fi
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.release-please.outputs.upload_url }}
+          asset_path: ${{ env.ASSET_PATH }}
+          asset_name: ${{ env.ASSET_NAME }}
+          asset_content_type: application/octet-stream
+
+  publish-github-action:
+    name: Publish GitHub Action
+    runs-on: ubuntu-latest
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.sha }}
+
+      - name: Create action.yml for GitHub Action
+        run: |
+          cat > action.yml << 'EOF'
+          name: 'Bedrock Forge Deploy'
+          description: 'Deploy AWS Bedrock agents using Bedrock Forge'
+          branding:
+            icon: 'cloud'
+            color: 'orange'
+          
+          inputs:
+            validation_only:
+              description: 'Run validation only (no deployment)'
+              required: false
+              default: 'true'
+            environment:
+              description: 'Environment to deploy (dev, staging, prod)'
+              required: false
+              default: 'dev'
+            aws_region:
+              description: 'AWS Region for deployment'
+              required: false
+              default: 'us-east-1'
+            aws_role:
+              description: 'AWS IAM Role ARN to assume for deployment'
+              required: false
+            aws_session_name:
+              description: 'AWS session name for the assumed role'
+              required: false
+              default: 'bedrock-forge-deploy'
+            terraform_version:
+              description: 'Terraform version to use'
+              required: false
+              default: '1.5.0'
+            go_version:
+              description: 'Go version to use for building Bedrock Forge'
+              required: false
+              default: '1.21'
+            bedrock_forge_version:
+              description: 'Bedrock Forge version/ref to use'
+              required: false
+              default: '${{ needs.release-please.outputs.tag_name }}'
+            source_path:
+              description: 'Path to YAML configurations in the repository'
+              required: false
+              default: '.'
+            tf_state_bucket:
+              description: 'S3 bucket for Terraform state'
+              required: false
+            tf_state_key_prefix:
+              description: 'Key prefix for Terraform state in S3'
+              required: false
+              default: 'bedrock-forge'
+            tf_state_lock_table:
+              description: 'DynamoDB table for Terraform state locking'
+              required: false
+            dry_run:
+              description: 'Run in dry-run mode (plan only, no apply)'
+              required: false
+              default: 'false'
+          
+          runs:
+            using: 'composite'
+            steps:
+              - name: Deploy with Bedrock Forge
+                uses: ./.github/workflows/bedrock-forge-deploy.yml
+                with:
+                  validation_only: ${{ inputs.validation_only }}
+                  environment: ${{ inputs.environment }}
+                  aws_region: ${{ inputs.aws_region }}
+                  aws_role: ${{ inputs.aws_role }}
+                  aws_session_name: ${{ inputs.aws_session_name }}
+                  terraform_version: ${{ inputs.terraform_version }}
+                  go_version: ${{ inputs.go_version }}
+                  bedrock_forge_version: ${{ inputs.bedrock_forge_version }}
+                  source_path: ${{ inputs.source_path }}
+                  tf_state_bucket: ${{ inputs.tf_state_bucket }}
+                  tf_state_key_prefix: ${{ inputs.tf_state_key_prefix }}
+                  tf_state_lock_table: ${{ inputs.tf_state_lock_table }}
+                  dry_run: ${{ inputs.dry_run }}
+          EOF
+
+      - name: Commit and push action.yml
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add action.yml
+          git commit -m "feat: add GitHub Action definition for ${{ needs.release-please.outputs.tag_name }}" || exit 0
+          git push
+
+  update-homebrew:
+    name: Update Homebrew Formula
+    runs-on: ubuntu-latest
+    needs: [release-please, build-and-upload]
+    if: needs.release-please.outputs.release_created == 'true'
+    
+    steps:
+      - name: Update Homebrew formula
+        uses: dawidd6/action-homebrew-bump-formula@v3
+        with:
+          token: ${{ secrets.HOMEBREW_GITHUB_TOKEN }}
+          formula: bedrock-forge
+          tag: ${{ needs.release-please.outputs.tag_name }}
+          revision: ${{ needs.release-please.outputs.sha }}
+        continue-on-error: true  # Don't fail the release if Homebrew update fails
+
+  notify-release:
+    name: Notify Release
+    runs-on: ubuntu-latest
+    needs: [release-please, build-and-upload, publish-github-action]
+    if: needs.release-please.outputs.release_created == 'true'
+    
+    steps:
+      - name: Create release summary
+        run: |
+          echo "## 🎉 Bedrock Forge ${{ needs.release-please.outputs.tag_name }} Released!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Installation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Go Install (Recommended):**" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "go install github.com/your-org/bedrock-forge/cmd/bedrock-forge@${{ needs.release-please.outputs.tag_name }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Download Binaries:**" >> $GITHUB_STEP_SUMMARY
+          echo "- [Linux AMD64](https://github.com/${{ github.repository }}/releases/download/${{ needs.release-please.outputs.tag_name }}/bedrock-forge-${{ needs.release-please.outputs.tag_name }}-linux-amd64.tar.gz)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Linux ARM64](https://github.com/${{ github.repository }}/releases/download/${{ needs.release-please.outputs.tag_name }}/bedrock-forge-${{ needs.release-please.outputs.tag_name }}-linux-arm64.tar.gz)" >> $GITHUB_STEP_SUMMARY
+          echo "- [macOS AMD64](https://github.com/${{ github.repository }}/releases/download/${{ needs.release-please.outputs.tag_name }}/bedrock-forge-${{ needs.release-please.outputs.tag_name }}-darwin-amd64.tar.gz)" >> $GITHUB_STEP_SUMMARY
+          echo "- [macOS ARM64](https://github.com/${{ github.repository }}/releases/download/${{ needs.release-please.outputs.tag_name }}/bedrock-forge-${{ needs.release-please.outputs.tag_name }}-darwin-arm64.tar.gz)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Windows AMD64](https://github.com/${{ github.repository }}/releases/download/${{ needs.release-please.outputs.tag_name }}/bedrock-forge-${{ needs.release-please.outputs.tag_name }}-windows-amd64.zip)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔄 GitHub Action" >> $GITHUB_STEP_SUMMARY
+          echo '```yaml' >> $GITHUB_STEP_SUMMARY
+          echo "- uses: your-org/bedrock-forge@${{ needs.release-please.outputs.tag_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "  with:" >> $GITHUB_STEP_SUMMARY
+          echo "    aws_role: \${{ vars.AWS_DEPLOYMENT_ROLE }}" >> $GITHUB_STEP_SUMMARY
+          echo "    tf_state_bucket: \${{ vars.TF_STATE_BUCKET }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

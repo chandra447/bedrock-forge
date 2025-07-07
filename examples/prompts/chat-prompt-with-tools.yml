@@ -1,0 +1,201 @@
+kind: Prompt
+metadata:
+  name: "ai-assistant-chat-prompt"
+  description: "Chat-based AI assistant with tool calling capabilities"
+spec:
+  description: "Advanced chat prompt with system messages, user/assistant messages, and tool configuration"
+  defaultVariant: "production"
+  
+  # Input variables for the entire prompt
+  inputVariables:
+    - name: "user_query"
+    - name: "context"
+    - name: "user_name"
+  
+  variants:
+    - name: "production"
+      modelId: "anthropic.claude-3-sonnet-20240229-v1:0"
+      templateType: "CHAT"
+      
+      templateConfiguration:
+        chat:
+          # System messages provide instructions and context
+          system:
+            - text: |
+                You are an intelligent AI assistant with access to various tools.
+                You can help users with questions, perform calculations, look up information, and execute actions.
+                
+                Guidelines:
+                - Use tools when appropriate to provide accurate information
+                - Be helpful, accurate, and concise
+                - If you're unsure about something, ask for clarification
+                - Always explain what tools you're using and why
+          
+          # Conversation messages (can include variables)
+          messages:
+            - role: "user"
+              content:
+                - text: "Hello, I'm {{user_name}}. Can you help me with something?"
+            
+            - role: "assistant"
+              content:
+                - text: "Hello {{user_name}}! I'm happy to help you. I have access to various tools that can assist with information lookup, calculations, and other tasks. What would you like help with today?"
+            
+            - role: "user"
+              content:
+                - text: "{{user_query}}"
+          
+          # Tool configuration for function calling
+          toolConfiguration:
+            tools:
+              - toolSpec:
+                  name: "search_knowledge_base"
+                  description: "Search the knowledge base for relevant information"
+                  inputSchema:
+                    json:
+                      type: "object"
+                      properties:
+                        query:
+                          type: "string"
+                          description: "Search query"
+                        category:
+                          type: "string"
+                          description: "Category to search in"
+                          enum: ["products", "policies", "faq", "technical"]
+                      required: ["query"]
+              
+              - toolSpec:
+                  name: "calculate"
+                  description: "Perform mathematical calculations"
+                  inputSchema:
+                    json:
+                      type: "object"
+                      properties:
+                        expression:
+                          type: "string"
+                          description: "Mathematical expression to calculate"
+                        precision:
+                          type: "integer"
+                          description: "Number of decimal places"
+                          default: 2
+                      required: ["expression"]
+              
+              - toolSpec:
+                  name: "get_order_status"
+                  description: "Get the status of a customer order"
+                  inputSchema:
+                    json:
+                      type: "object"
+                      properties:
+                        order_id:
+                          type: "string"
+                          description: "Order ID to look up"
+                        customer_id:
+                          type: "string"
+                          description: "Customer ID for verification"
+                      required: ["order_id"]
+            
+            # Tool choice configuration
+            toolChoice:
+              auto: {}  # Let the model decide when to use tools
+              # Alternatively:
+              # any: {}  # Model must use at least one tool
+              # tool:
+              #   name: "search_knowledge_base"  # Force specific tool
+          
+          # Variables used in this chat template
+          inputVariables:
+            - name: "user_query"
+            - name: "context"
+            - name: "user_name"
+      
+      inferenceConfiguration:
+        text:
+          temperature: 0.2
+          topP: 0.9
+          maxTokens: 4096
+          stopSequences: ["Human:", "User:"]
+    
+    - name: "development"
+      modelId: "anthropic.claude-3-sonnet-20240229-v1:0"
+      templateType: "CHAT"
+      
+      templateConfiguration:
+        chat:
+          system:
+            - text: |
+                [DEBUG MODE] AI Assistant with Tools
+                - Tool calls will be logged
+                - Verbose responses for debugging
+                - Include reasoning for tool selection
+          
+          messages:
+            - role: "user"
+              content:
+                - text: "[DEV] User: {{user_name}} | Query: {{user_query}}"
+          
+          toolConfiguration:
+            tools:
+              - toolSpec:
+                  name: "debug_search"
+                  description: "Debug version of search with detailed logging"
+                  inputSchema:
+                    json:
+                      type: "object"
+                      properties:
+                        query:
+                          type: "string"
+                          description: "Search query"
+                        debug_level:
+                          type: "string"
+                          description: "Debug verbosity level"
+                          enum: ["low", "medium", "high"]
+                          default: "medium"
+                      required: ["query"]
+            
+            toolChoice:
+              auto: {}
+          
+          inputVariables:
+            - name: "user_query"
+            - name: "user_name"
+      
+      inferenceConfiguration:
+        text:
+          temperature: 0.3
+          topP: 0.95
+          maxTokens: 2048
+    
+    - name: "restricted"
+      modelId: "anthropic.claude-3-haiku-20240307-v1:0"
+      templateType: "CHAT"
+      
+      templateConfiguration:
+        chat:
+          system:
+            - text: |
+                You are a helpful but restricted AI assistant.
+                You can only provide information and cannot use tools.
+                Keep responses brief and factual.
+          
+          messages:
+            - role: "user"
+              content:
+                - text: "{{user_query}}"
+          
+          # No tool configuration - this variant cannot use tools
+          
+          inputVariables:
+            - name: "user_query"
+      
+      inferenceConfiguration:
+        text:
+          temperature: 0.1
+          topP: 0.8
+          maxTokens: 1024
+  
+  tags:
+    Environment: "production"
+    Team: "ai-platform"
+    TemplateType: "chat"
+    ToolsEnabled: "true"

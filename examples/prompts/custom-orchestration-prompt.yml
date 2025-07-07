@@ -6,23 +6,34 @@ spec:
   description: "Custom orchestration prompt for customer support"
   defaultVariant: "production"
   
+  # Define input variables that can be used across all variants
+  inputVariables:
+    - name: "query"
+    - name: "context"
+  
   variants:
     - name: "production"
       modelId: "anthropic.claude-3-sonnet-20240229-v1:0"
       templateType: "TEXT"
       templateConfiguration:
-        text: |
-          You are a customer support agent. Always be helpful and professional.
+        text:
+          text: |
+            You are a customer support agent. Always be helpful and professional.
+            
+            Instructions:
+            1. Greet the customer warmly
+            2. Listen to their concern
+            3. Provide accurate information
+            4. Offer additional assistance
+            
+            Customer Query: {{query}}
+            
+            Context: {{context}}
           
-          Instructions:
-          1. Greet the customer warmly
-          2. Listen to their concern
-          3. Provide accurate information
-          4. Offer additional assistance
-          
-          Customer Query: {{query}}
-          
-          Context: {{context}}
+          # Specify which variables this template uses
+          inputVariables:
+            - name: "query"
+            - name: "context"
       
       inferenceConfiguration:
         text:
@@ -35,13 +46,18 @@ spec:
       modelId: "anthropic.claude-3-sonnet-20240229-v1:0"
       templateType: "TEXT"
       templateConfiguration:
-        text: |
-          [DEBUG MODE] Customer Support Agent
+        text:
+          text: |
+            [DEBUG MODE] Customer Support Agent
+            
+            Query: {{query}}
+            Context: {{context}}
+            
+            Debug info will be included in responses.
           
-          Query: {{query}}
-          Context: {{context}}
-          
-          Debug info will be included in responses.
+          inputVariables:
+            - name: "query"
+            - name: "context"
       
       inferenceConfiguration:
         text:
