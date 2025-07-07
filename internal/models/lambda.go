@@ -7,15 +7,30 @@ type Lambda struct {
 }
 
 type LambdaSpec struct {
-	Runtime             string            `yaml:"runtime"`
-	Handler             string            `yaml:"handler"`
-	Code                CodeConfiguration `yaml:"code"`
-	Environment         map[string]string `yaml:"environment,omitempty"`
-	Timeout             int               `yaml:"timeout,omitempty"`
-	MemorySize          int               `yaml:"memorySize,omitempty"`
-	ReservedConcurrency int               `yaml:"reservedConcurrency,omitempty"`
-	Tags                map[string]string `yaml:"tags,omitempty"`
-	VpcConfig           *VpcConfig        `yaml:"vpcConfig,omitempty"`
+	Runtime             string                `yaml:"runtime"`
+	Handler             string                `yaml:"handler"`
+	Code                CodeConfiguration     `yaml:"code"`
+	Environment         map[string]string     `yaml:"environment,omitempty"`
+	Timeout             int                   `yaml:"timeout,omitempty"`
+	MemorySize          int                   `yaml:"memorySize,omitempty"`
+	ReservedConcurrency int                   `yaml:"reservedConcurrency,omitempty"`
+	Tags                map[string]string     `yaml:"tags,omitempty"`
+	VpcConfig           *VpcConfig            `yaml:"vpcConfig,omitempty"`
+	ResourcePolicy      *LambdaResourcePolicy `yaml:"resourcePolicy,omitempty"`
+}
+
+type LambdaResourcePolicy struct {
+	AllowBedrockAgents bool                       `yaml:"allowBedrockAgents,omitempty"`
+	Statements         []LambdaResourcePolicyStmt `yaml:"statements,omitempty"`
+}
+
+type LambdaResourcePolicyStmt struct {
+	Sid       string                 `yaml:"sid"`
+	Effect    string                 `yaml:"effect"`
+	Principal map[string]interface{} `yaml:"principal"`
+	Action    interface{}            `yaml:"action"` // string or []string
+	Resource  string                 `yaml:"resource,omitempty"`
+	Condition map[string]interface{} `yaml:"condition,omitempty"`
 }
 
 type CodeConfiguration struct {

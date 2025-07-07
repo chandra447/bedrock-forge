@@ -81,6 +81,16 @@ func (g *HCLGenerator) generateAutoIAMRole(body *hclwrite.Body, agentName string
 						}),
 						"resource": cty.StringVal("arn:aws:bedrock:*::foundation-model/*"),
 					}),
+					// Inference profile access
+					cty.ObjectVal(map[string]cty.Value{
+						"effect": cty.StringVal("Allow"),
+						"action": cty.ListVal([]cty.Value{
+							cty.StringVal("bedrock:GetInferenceProfile"),
+							cty.StringVal("bedrock:ListInferenceProfiles"),
+							cty.StringVal("bedrock:UseInferenceProfile"),
+						}),
+						"resource": cty.StringVal("arn:aws:bedrock:*:*:inference-profile/*"),
+					}),
 					// Lambda invocation for action groups
 					cty.ObjectVal(map[string]cty.Value{
 						"effect": cty.StringVal("Allow"),
@@ -129,35 +139,6 @@ func (g *HCLGenerator) generateAutoIAMRole(body *hclwrite.Body, agentName string
 	return nil
 }
 
-// getAgentRoleReference returns the IAM role reference for an agent
-func (g *HCLGenerator) getAgentRoleReference(agentName string, iamConfig *models.IAMRoleConfig) string {
-	if iamConfig == nil {
-		// Default to auto-created role
-		roleName := fmt.Sprintf("%s_execution_role", g.sanitizeResourceName(agentName))
-		return fmt.Sprintf("${module.%s.role_arn}", roleName)
-	}
-
-	if iamConfig.RoleArn != "" {
-		// Use existing role ARN
-		return iamConfig.RoleArn
-	}
-
-	if iamConfig.RoleName != "" {
-		// Reference to manually defined IAMRole resource
-		roleName := g.sanitizeResourceName(iamConfig.RoleName)
-		return fmt.Sprintf("${module.%s.role_arn}", roleName)
-	}
-
-	if iamConfig.AutoCreate {
-		// Auto-created role
-		roleName := fmt.Sprintf("%s_execution_role", g.sanitizeResourceName(agentName))
-		return fmt.Sprintf("${module.%s.role_arn}", roleName)
-	}
-
-	// Fallback to auto-created role
-	roleName := fmt.Sprintf("%s_execution_role", g.sanitizeResourceName(agentName))
-	return fmt.Sprintf("${module.%s.role_arn}", roleName)
-}
 
 // generateIAMRoleModule creates a Terraform module call for an IAM role
 func (g *HCLGenerator) generateIAMRoleModule(body *hclwrite.Body, resource models.BaseResource) error {

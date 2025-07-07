@@ -15,3 +15,5 @@ spec:
   tags:
     Function: "OrderLookup"
     Team: "CustomerSupport"
+# Note: No resource policy configuration needed! 
+# bedrock-forge automatically creates agent-specific permissions when agents reference this Lambda

@@ -1,0 +1,44 @@
+kind: Lambda
+metadata:
+  name: "order-lookup-secured"
+  description: "Lambda function with custom resource-based policies for Bedrock agents"
+spec:
+  runtime: "python3.9"
+  handler: "app.handler"
+  code:
+    source: "directory"  # Code is in the same directory as this YAML file
+  environment:
+    ORDER_API_URL: "https://api.company.com/orders"
+    LOG_LEVEL: "INFO"
+  timeout: 30
+  memorySize: 256
+  
+  # Resource-based policy configuration
+  resourcePolicy:
+    # Allow general Bedrock agent access (default behavior)
+    allowBedrockAgents: true
+    
+    # Additional custom policy statements
+    statements:
+      - sid: "AllowSpecificBedrockService"
+        effect: "Allow"
+        principal:
+          Service: "bedrock.amazonaws.com"
+        action: "lambda:InvokeFunction"
+        condition:
+          StringEquals:
+            "aws:SourceAccount": "${data.aws_caller_identity.current.account_id}"
+      
+      - sid: "AllowCrossAccountInvoke"
+        effect: "Allow"
+        principal:
+          AWS: "arn:aws:iam::123456789012:root"
+        action: "lambda:InvokeFunction"
+        condition:
+          StringLike:
+            "aws:SourceArn": "arn:aws:bedrock:*:123456789012:agent/*"
+  
+  tags:
+    Function: "OrderLookup"
+    Team: "CustomerSupport"
+    SecurityLevel: "Enhanced"

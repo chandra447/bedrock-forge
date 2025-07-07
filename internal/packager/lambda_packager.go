@@ -149,7 +149,7 @@ func (p *LambdaPackager) findLambdaDirectory(baseDir, lambdaName string) (string
 	}
 
 	if lambdaDir == "" {
-		return "", fmt.Errorf("Lambda directory not found for %s", lambdaName)
+		return "", fmt.Errorf("lambda directory not found for %s", lambdaName)
 	}
 
 	return lambdaDir, nil

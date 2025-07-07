@@ -77,6 +77,8 @@ spec:
 ```
 
 ### Lambda Configuration
+
+**Basic Lambda Function:**
 ```yaml
 kind: Lambda
 metadata:
@@ -93,6 +95,37 @@ spec:
   timeout: 30
   memorySize: 256
 ```
+
+**Zero-Configuration Lambda Functions:**
+```yaml
+kind: Lambda
+metadata:
+  name: "order-lookup"
+  description: "Lambda function to look up customer orders"
+spec:
+  runtime: "python3.9"
+  handler: "app.handler"
+  code:
+    source: "directory"
+  environment:
+    ORDER_API_URL: "https://api.company.com/orders"
+  timeout: 30
+  memorySize: 256
+# No resource policy needed - bedrock-forge handles permissions automatically!
+```
+
+**Automatic Permission Management:**
+- **Zero Configuration Required**: No manual policy setup needed for Lambda functions
+- **Intelligent Detection**: Lambda generator automatically scans all agents to detect which ones reference each Lambda function
+- **Agent-Specific Permissions**: When agents reference a Lambda, automatic creation of agent-specific permissions with `aws:SourceArn` restrictions
+- **Future-Proof Permissions**: Lambda functions not yet referenced by agents get general Bedrock permissions for future use
+- **Maximum Security**: Each agent can only invoke Lambda functions it specifically references in action groups
+- **Enterprise Flexibility**: Optional custom `resourcePolicy` configuration for advanced scenarios
+
+**Permission Logic:**
+- **With Agent References**: Creates agent-specific permissions using `${module.agent_name.agent_arn}` as source ARN condition
+- **Without Agent References**: Creates general `bedrock.amazonaws.com` permission ready for future agent integration
+- **Custom Policies**: Advanced users can add additional policy statements for cross-account access or enterprise requirements
 
 ### ActionGroup Configuration
 
@@ -781,6 +814,37 @@ The Prompt resource has been significantly enhanced to support all AWS Bedrock T
 - Existing prompts continue to work without changes
 - New features are opt-in through updated YAML structure
 - Enhanced generator handles both old and new formats seamlessly
+
+**Enhanced Lambda Resource-Based Policies (Current Update):**
+
+bedrock-forge now provides comprehensive management of Lambda function resource-based policies for Bedrock agent integration:
+
+**New Capabilities:**
+- **Automatic Permission Management**: Default `bedrock.amazonaws.com` invoke permissions on all Lambda functions
+- **Agent-Specific Permissions**: Auto-generated `aws_lambda_permission` resources with source ARN restrictions per agent
+- **Custom Resource Policies**: Full control over Lambda resource-based policies through YAML configuration
+- **Security Best Practices**: Account-specific and cross-account access controls with condition support
+- **Dependency Management**: Proper Terraform ordering between agents, Lambda functions, and permissions
+
+**Key Features:**
+1. **Default Security**: Every Lambda gets basic Bedrock service permissions automatically
+2. **Enhanced Security**: Agent-specific permissions with `arn:aws:bedrock:region:account:agent/agent-id` source ARN patterns
+3. **Custom Policies**: Additional policy statements for enterprise scenarios (cross-account access, etc.)
+4. **Zero Configuration**: Works out-of-the-box for simple agent-to-Lambda scenarios
+5. **Enterprise Control**: Full policy customization for complex organizational requirements
+
+**Use Cases:**
+- **Simple Agents**: Default permissions handle basic agent-to-Lambda invocation automatically
+- **Multi-Agent Systems**: Each agent gets specific permissions to only invoke its referenced Lambda functions
+- **Cross-Account Access**: Custom policies for shared Lambda functions across AWS accounts
+- **Enterprise Compliance**: Account restrictions and conditional access for organizational security standards
+
+**Implementation Details:**
+- **Zero-Configuration Default**: Lambda functions require no resource policy configuration - permissions are handled automatically
+- **Intelligent Agent Detection**: Lambda generator scans all agents during generation to detect references and create appropriate permissions
+- **Agent-Specific Security**: Each agent gets permissions only for Lambda functions it actually references, with source ARN restrictions
+- **Automatic Policy Generation**: Resource-based policies are created directly in the Lambda module, eliminating separate permission resources
+- **Optional Customization**: Advanced users can still add custom `resourcePolicy` statements for enterprise scenarios
 
 ---
 
