@@ -139,7 +139,6 @@ func (g *HCLGenerator) generateAutoIAMRole(body *hclwrite.Body, agentName string
 	return nil
 }
 
-
 // generateIAMRoleModule creates a Terraform module call for an IAM role
 func (g *HCLGenerator) generateIAMRoleModule(body *hclwrite.Body, resource models.BaseResource) error {
 	roleSpec, ok := resource.Spec.(models.IAMRoleSpec)
