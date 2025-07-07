@@ -94,7 +94,7 @@ jobs:
       - name: Checkout Bedrock Forge
         uses: actions/checkout@v4
         with:
-          repository: 'your-org/bedrock-forge'  # Update with actual repository
+          repository: 'your-org/bedrock-forge'  
           ref: ${{ inputs.bedrock_forge_version }}
           path: .bedrock-forge
 
