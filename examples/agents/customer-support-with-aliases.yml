@@ -48,8 +48,6 @@ spec:
     # Development alias for testing
     - name: "dev"
       description: "Development version for testing new features"
-      routingConfiguration:
-        - agentVersion: "DRAFT"  # Use latest draft version
       tags:
         Environment: "dev"
         Purpose: "development-testing"
@@ -58,39 +56,26 @@ spec:
     # Staging alias for pre-production validation
     - name: "staging"
       description: "Staging version for pre-production validation"
-      routingConfiguration:
-        - agentVersion: "1"  # Use specific prepared version
       tags:
         Environment: "staging"
         Purpose: "pre-production-validation"
         ApprovalRequired: "true"
     
-    # Production alias with traffic splitting between versions
+    # Production alias for live customer service
     - name: "prod"
       description: "Production version serving live customers"
-      routingConfiguration:
-        # 90% traffic to stable version
-        - agentVersion: "2"
-          provisionedThroughput: "90"
-        # 10% traffic to new version for gradual rollout
-        - agentVersion: "3"
-          provisionedThroughput: "10"
       tags:
         Environment: "prod"
         Purpose: "live-customer-service"
         CriticalService: "true"
         MonitoringLevel: "high"
     
-    # Canary alias for testing new versions with minimal traffic
+    # Canary alias for testing new versions
     - name: "canary"
       description: "Canary deployment for testing new agent versions"
-      routingConfiguration:
-        - agentVersion: "DRAFT"
-          provisionedThroughput: "5"  # Very low traffic for testing
       tags:
         Environment: "prod"
         Purpose: "canary-testing"
-        TrafficPercentage: "5"
   
   tags:
     # Required enterprise tags

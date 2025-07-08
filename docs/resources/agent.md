@@ -237,39 +237,41 @@ spec:
   aliases:
     - name: "dev"
       description: "Development version for testing"
-      routingConfiguration:
-        - agentVersion: "DRAFT"
+      tags:
+        Environment: "dev"
+        Purpose: "development"
     
     - name: "prod"
       description: "Production version"
-      routingConfiguration:
-        - agentVersion: "1"
+      tags:
+        Environment: "prod"
+        Purpose: "production"
 ```
 
-### Advanced Alias with Traffic Splitting
+### Multiple Aliases for Different Environments
 
 ```yaml
 aliases:
+  - name: "dev"
+    description: "Development environment alias"
+    tags:
+      Environment: "dev"
+      Purpose: "development"
+      AutoUpdate: "true"
+  
+  - name: "staging"
+    description: "Staging environment for testing"
+    tags:
+      Environment: "staging"
+      Purpose: "pre-production"
+      ApprovalRequired: "true"
+  
   - name: "prod"
-    description: "Production with blue-green deployment"
-    routingConfiguration:
-      # 90% traffic to stable version
-      - agentVersion: "2"
-        provisionedThroughput: "90"
-      # 10% traffic to new version
-      - agentVersion: "3"
-        provisionedThroughput: "10"
+    description: "Production environment"
     tags:
       Environment: "prod"
-      DeploymentStrategy: "blue-green"
-  
-  - name: "canary"
-    description: "Canary testing with minimal traffic"
-    routingConfiguration:
-      - agentVersion: "DRAFT"
-        provisionedThroughput: "5"
-    tags:
-      Purpose: "canary-testing"
+      Purpose: "production"
+      CriticalService: "true"
 ```
 
 ### Alias Configuration Options
@@ -278,23 +280,15 @@ aliases:
 |-------|------|-------------|
 | `name` | string | Alias name (required) |
 | `description` | string | Alias description |
-| `routingConfiguration` | array | Traffic routing rules |
 | `tags` | object | Alias-specific tags |
-
-### Routing Configuration
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `agentVersion` | string | Agent version ("DRAFT", "1", "2", etc.) |
-| `provisionedThroughput` | string | Traffic percentage (0-100) |
 
 ### Deployment Benefits
 
 - **Environment Separation**: Dev, staging, and production aliases
-- **Traffic Splitting**: Gradual rollouts with version-specific traffic
-- **Canary Deployments**: Test new versions with minimal traffic
-- **Blue-Green Deployments**: Instant traffic switching between versions
-- **Version Management**: Named references to specific agent versions
+- **Named References**: Stable references to agents across environments
+- **Environment-Specific Tagging**: Tag aliases for different deployment contexts
+- **Simplified Management**: Organize agent deployments by purpose and environment
+- **CI/CD Integration**: Use aliases in deployment pipelines for different stages
 
 ## Best Practices
 

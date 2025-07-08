@@ -74,7 +74,74 @@ spec:
   memoryConfiguration:
     enabledMemoryTypes: ["SESSION_SUMMARY"]
     storageDays: 30
+  
+  # Agent aliases for deployment strategies
+  aliases:
+    - name: "dev"
+      description: "Development version for testing"
+      tags:
+        Environment: "dev"
+        Purpose: "development"
+    
+    - name: "prod"
+      description: "Production version"
+      tags:
+        Environment: "prod"
+        Purpose: "production"
+        CriticalService: "true"
 ```
+
+### Agent Aliases
+
+Agent aliases enable deployment strategies like staging, production, and environment separation by creating named references to agent deployments.
+
+#### Basic Alias Configuration
+```yaml
+aliases:
+  - name: "dev"
+    description: "Development version for testing"
+    tags:
+      Environment: "dev"
+      Purpose: "development"
+  
+  - name: "prod"
+    description: "Production version"
+    tags:
+      Environment: "prod"
+      Purpose: "production"
+```
+
+#### Multiple Environment Aliases
+```yaml
+aliases:
+  - name: "dev"
+    description: "Development environment"
+    tags:
+      Environment: "dev"
+      Purpose: "development"
+      AutoUpdate: "true"
+  
+  - name: "staging"
+    description: "Staging environment for testing"
+    tags:
+      Environment: "staging"
+      Purpose: "pre-production"
+      ApprovalRequired: "true"
+  
+  - name: "prod"
+    description: "Production environment"
+    tags:
+      Environment: "prod"
+      Purpose: "production"
+      CriticalService: "true"
+```
+
+#### Deployment Benefits
+- **Environment Separation**: Dev, staging, and production aliases
+- **Named References**: Stable references to agents across environments
+- **Environment-Specific Tagging**: Tag aliases for different deployment contexts
+- **Simplified Management**: Organize agent deployments by purpose and environment
+- **CI/CD Integration**: Use aliases in deployment pipelines for different stages
 
 ### Lambda Configuration
 
@@ -136,13 +203,27 @@ metadata:
   name: "order-management"
   description: "Action group for order operations"
 spec:
+  # Required: Agent ID (module reference or direct ARN)
+  agentId: "${module.customer_support.agent_id}"  # References local agent module
+  agentVersion: "DRAFT"                            # Optional: Agent version (defaults to DRAFT)
   description: "Provides order lookup capabilities"
+  # Required: Action group executor
   actionGroupExecutor:
     lambda: "order-lookup"  # References Lambda resource defined in same project
   apiSchema:
     s3:
       s3BucketName: "bedrock-schemas"
       s3ObjectKey: "action-groups/order-management/openapi.json"
+  # Function schema for simple cases
+  functionSchema:
+    functions:
+      - name: "lookup_order"
+        description: "Look up order details by order ID"
+        parameters:
+          order_id:
+            type: "string"
+            description: "The unique order identifier"
+            required: true
 ```
 
 **Using Existing Lambda ARN (Shared Lambda):**
@@ -152,13 +233,21 @@ metadata:
   name: "shared-inventory-management"
   description: "Action group using shared Lambda function"
 spec:
+  # Required: Agent ID (direct ARN for existing agent)
+  agentId: "arn:aws:bedrock:us-east-1:123456789012:agent/ABCD1234"  # Existing agent ARN
+  agentVersion: "1"  # Use specific version for production
   description: "Provides inventory management using shared team Lambda function"
+  # Required: Action group executor
   actionGroupExecutor:
     lambdaArn: "arn:aws:lambda:us-east-1:123456789012:function:inventory-team-prod-inventory-service"
   apiSchema:
     s3:
       s3BucketName: "bedrock-schemas"
       s3ObjectKey: "action-groups/shared-inventory-management/openapi.json"
+  tags:
+    Environment: "prod"
+    Project: "inventory-management"
+    Owner: "inventory-team@company.com"
 ```
 
 **Important**: When using `lambdaArn`, ensure the Bedrock agent's IAM role has `lambda:InvokeFunction` permission for the specified Lambda function.
@@ -509,6 +598,515 @@ bedrock-forge version
 - **Enterprise**: Production-ready validation with strict governance policies
 - **Custom**: User-defined validation rules via configuration file
 
+## Getting Started Guide
+
+### Prerequisites
+
+Before starting, ensure you have:
+- **Go 1.21+** installed
+- **AWS CLI** configured with appropriate credentials
+- **Terraform 1.0+** installed
+- **Git repository** for your project
+- **AWS account** with Bedrock access enabled
+
+### Installation
+
+**Option 1: Global Installation (Recommended)**
+```bash
+go install github.com/your-org/bedrock-forge/cmd/bedrock-forge@latest
+bedrock-forge version
+```
+
+**Option 2: Clone and Build**
+```bash
+git clone https://github.com/your-org/bedrock-forge
+cd bedrock-forge
+go build -o bedrock-forge ./cmd/bedrock-forge
+./bedrock-forge version
+```
+
+### Quick Start: Create Your First Agent
+
+**Step 1: Create Project Directory**
+```bash
+mkdir my-bedrock-project
+cd my-bedrock-project
+```
+
+**Step 2: Create Simple Agent**
+```bash
+# Create agent.yml
+cat > agent.yml << 'EOF'
+kind: Agent
+metadata:
+  name: "hello-agent"
+  description: "My first Bedrock agent"
+spec:
+  foundationModel: "anthropic.claude-3-sonnet-20240229-v1:0"
+  instruction: "You are a helpful AI assistant that provides clear and concise answers."
+  idleSessionTtlInSeconds: 3600
+  
+  tags:
+    Environment: "dev"
+    Project: "my-first-agent"
+    Owner: "developer@company.com"
+EOF
+```
+
+**Step 3: Generate and Deploy**
+```bash
+# Validate configuration
+bedrock-forge validate .
+
+# Generate Terraform
+bedrock-forge generate . ./terraform
+
+# Deploy with Terraform
+cd terraform
+terraform init
+terraform plan
+terraform apply
+```
+
+### Adding Lambda Functions
+
+**Step 1: Create Lambda Function**
+```bash
+# Create lambda.yml
+cat > lambda.yml << 'EOF'
+kind: Lambda
+metadata:
+  name: "weather-lookup"
+  description: "Get weather information"
+spec:
+  runtime: "python3.11"
+  handler: "app.handler"
+  code:
+    source: "directory"  # Code in same directory
+  environment:
+    API_KEY: "your-weather-api-key"
+  timeout: 30
+  memorySize: 256
+  
+  tags:
+    Environment: "dev"
+    Project: "weather-service"
+EOF
+```
+
+**Step 2: Create Lambda Code**
+```bash
+# Create app.py
+cat > app.py << 'EOF'
+import json
+import os
+
+def handler(event, context):
+    # Extract function name and parameters
+    function_name = event.get('function', '')
+    parameters = event.get('parameters', {})
+    
+    if function_name == 'get_weather':
+        location = parameters.get('location', 'Unknown')
+        # Mock weather data - replace with real API call
+        weather_data = {
+            'location': location,
+            'temperature': '22°C',
+            'condition': 'Sunny',
+            'humidity': '45%'
+        }
+        return {
+            'statusCode': 200,
+            'body': json.dumps(weather_data)
+        }
+    
+    return {
+        'statusCode': 400,
+        'body': json.dumps({'error': 'Unknown function'})
+    }
+EOF
+```
+
+**Step 3: Update Agent with Action Group**
+```bash
+# Update agent.yml
+cat > agent.yml << 'EOF'
+kind: Agent
+metadata:
+  name: "weather-agent"
+  description: "Agent with weather lookup capability"
+spec:
+  foundationModel: "anthropic.claude-3-sonnet-20240229-v1:0"
+  instruction: "You are a helpful weather assistant. Use the get_weather function to provide current weather information for any location."
+  idleSessionTtlInSeconds: 3600
+  
+  # Inline action groups
+  actionGroups:
+    - name: "weather-tools"
+      description: "Weather lookup tools"
+      actionGroupExecutor:
+        lambda: "weather-lookup"  # References Lambda above
+      functionSchema:
+        functions:
+          - name: "get_weather"
+            description: "Get current weather for a location"
+            parameters:
+              location:
+                type: "string"
+                description: "City name or location"
+                required: true
+  
+  tags:
+    Environment: "dev"
+    Project: "weather-agent"
+    Owner: "developer@company.com"
+EOF
+```
+
+### Adding Knowledge Base
+
+**Step 1: Create Knowledge Base**
+```bash
+# Create knowledge-base.yml
+cat > knowledge-base.yml << 'EOF'
+kind: KnowledgeBase
+metadata:
+  name: "company-faq"
+  description: "Company FAQ knowledge base"
+spec:
+  knowledgeBaseConfiguration:
+    type: "VECTOR"
+    vectorKnowledgeBaseConfiguration:
+      embeddingModelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v1"
+  
+  storageConfiguration:
+    type: "OPENSEARCH_SERVERLESS"
+    openSearchServerless:
+      collectionArn: "arn:aws:aoss:us-east-1:123456789012:collection/kb-collection"
+      vectorIndexName: "knowledge-index"
+      fieldMapping:
+        vectorField: "vector"
+        textField: "text"
+        metadataField: "metadata"
+  
+  dataSources:
+    - name: "faq-documents"
+      type: "S3"
+      s3Configuration:
+        bucketArn: "arn:aws:s3:::company-docs"
+        inclusionPrefixes: ["faq/"]
+      chunkingConfiguration:
+        chunkingStrategy: "FIXED_SIZE"
+        fixedSizeChunkingConfiguration:
+          maxTokens: 512
+          overlapPercentage: 20
+  
+  tags:
+    Environment: "dev"
+    Project: "company-kb"
+EOF
+```
+
+**Step 2: Link Agent to Knowledge Base**
+```bash
+# Create agent-kb-association.yml
+cat > agent-kb-association.yml << 'EOF'
+kind: AgentKnowledgeBaseAssociation
+metadata:
+  name: "weather-agent-faq-link"
+  description: "Link weather agent to company FAQ"
+spec:
+  agentName: "weather-agent"
+  knowledgeBaseName: "company-faq"
+  description: "Company FAQ for weather agent"
+  state: "ENABLED"
+EOF
+```
+
+### Complete Deployment Workflow
+
+**Step 1: Validate All Resources**
+```bash
+bedrock-forge validate .
+```
+
+**Step 2: Generate Terraform**
+```bash
+bedrock-forge generate . ./terraform
+```
+
+**Step 3: Review Generated Terraform**
+```bash
+ls ./terraform/
+# main.tf - Generated Terraform configuration
+# variables.tf - Input variables
+# outputs.tf - Module outputs
+```
+
+**Step 4: Deploy Infrastructure**
+```bash
+cd terraform
+terraform init
+terraform plan
+terraform apply
+```
+
+**Step 5: Test Your Agent**
+```bash
+# Use AWS CLI or Console to test agent
+aws bedrock-agent-runtime invoke-agent \
+  --agent-id <agent-id> \
+  --agent-alias-id <alias-id> \
+  --session-id test-session \
+  --input-text "What's the weather like in London?"
+```
+
+### Best Practices for Getting Started
+
+1. **Start Simple**: Begin with a basic agent, then add features incrementally
+2. **Use Validation**: Always run `bedrock-forge validate` before generation
+3. **Version Control**: Keep YAML configurations in Git for tracking changes
+4. **Environment Separation**: Use different directories for dev/staging/prod
+5. **Test Locally**: Validate YAML and Terraform generation before deployment
+6. **Monitor Costs**: Be aware of AWS Bedrock pricing for foundation models
+7. **Security**: Use appropriate IAM roles and don't commit sensitive data
+
+## IAM Management
+
+**🎉 IAM roles are automatically generated for all Bedrock resources!** No manual configuration required.
+
+Every Bedrock resource gets appropriate IAM permissions automatically:
+- **Agents**: Foundation model access, Lambda invocation, knowledge base access, CloudWatch logging
+- **Lambda Functions**: Execution roles with VPC access and CloudWatch logging
+- **Action Groups**: Inherit permissions from associated agent roles
+- **Knowledge Bases**: S3 access and OpenSearch operations
+
+### Auto-Generated Agent IAM Roles
+
+When you create an Agent, Bedrock Forge automatically generates:
+1. **IAM Role**: `bedrock-agent-{agent-name}-role`
+2. **IAM Policy**: `bedrock-agent-{agent-name}-policy`
+
+#### Foundation Model Access
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:InvokeModel",
+        "bedrock:InvokeModelWithResponseStream",
+        "bedrock:GetInferenceProfile",
+        "bedrock:ListInferenceProfiles", 
+        "bedrock:UseInferenceProfile"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+#### Lambda Invocation (for Action Groups)
+Auto-generated when agents reference Lambda functions:
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["lambda:InvokeFunction"],
+      "Resource": "arn:aws:lambda:region:account:function:function-name"
+    }
+  ]
+}
+```
+
+#### Knowledge Base Access
+Auto-generated when agents are associated with knowledge bases:
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:Retrieve",
+        "bedrock:RetrieveAndGenerate"
+      ],
+      "Resource": "arn:aws:bedrock:region:account:knowledge-base/*"
+    }
+  ]
+}
+```
+
+#### CloudWatch Logging
+Always included for debugging and monitoring:
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": "arn:aws:logs:*:*:*"
+    }
+  ]
+}
+```
+
+### Lambda Resource-Based Policies
+
+Lambda functions automatically get resource-based policies allowing Bedrock agent invocation:
+
+#### Agent-Specific Permissions
+When agents reference Lambda functions, automatic creation of agent-specific permissions:
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {"Service": "bedrock.amazonaws.com"},
+      "Action": "lambda:InvokeFunction",
+      "Resource": "arn:aws:lambda:region:account:function:function-name",
+      "Condition": {
+        "StringEquals": {
+          "aws:SourceArn": "arn:aws:bedrock:region:account:agent/agent-id"
+        }
+      }
+    }
+  ]
+}
+```
+
+#### General Bedrock Permissions
+For Lambda functions not yet referenced by agents:
+```json
+{
+  "Version": "2012-10-17", 
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {"Service": "bedrock.amazonaws.com"},
+      "Action": "lambda:InvokeFunction",
+      "Resource": "arn:aws:lambda:region:account:function:function-name"
+    }
+  ]
+}
+```
+
+### Custom IAM Configuration
+
+For enterprise scenarios requiring specific permissions, you can define custom IAM roles:
+
+#### Manual IAM Role Resource
+```yaml
+kind: IAMRole
+metadata:
+  name: "custom-agent-role"
+  description: "Custom IAM role for enterprise agent"
+spec:
+  assumeRolePolicy:
+    version: "2012-10-17"
+    statement:
+      - effect: "Allow"
+        principal:
+          service: "bedrock.amazonaws.com"
+        action: "sts:AssumeRole"
+  policies:
+    - policyArn: "arn:aws:iam::aws:policy/service-role/AmazonBedrockAgentResourcePolicy"
+  inlinePolicies:
+    - name: "CustomBedrockAccess"
+      policy:
+        version: "2012-10-17"
+        statement:
+          - effect: "Allow"
+            action: ["bedrock:InvokeModel"]
+            resource: "arn:aws:bedrock:*::foundation-model/anthropic.*"
+  tags:
+    Purpose: "BedrockAgent"
+    Compliance: "SOC2"
+```
+
+#### Custom Lambda Resource Policy
+For advanced scenarios, Lambda functions can include custom resource policies:
+```yaml
+kind: Lambda
+metadata:
+  name: "secure-lambda"
+spec:
+  runtime: "python3.11"
+  handler: "app.handler"
+  code:
+    source: "directory"
+  
+  # Optional: Custom resource policy for advanced scenarios
+  resourcePolicy:
+    version: "2012-10-17"
+    statement:
+      - effect: "Allow"
+        principal:
+          service: "bedrock.amazonaws.com"
+        action: "lambda:InvokeFunction"
+        condition:
+          StringEquals:
+            "aws:SourceAccount": "123456789012"
+      - effect: "Allow"
+        principal:
+          aws: "arn:aws:iam::456789012345:root"  # Cross-account access
+        action: "lambda:InvokeFunction"
+```
+
+### IAM Best Practices
+
+#### Development Environment
+- Use auto-generated IAM roles for simplicity
+- Rely on default permissions for rapid prototyping
+- Monitor CloudWatch logs for permission issues
+
+#### Production Environment
+- Review auto-generated policies before deployment
+- Consider custom IAM roles for compliance requirements
+- Implement least-privilege access controls
+- Use resource-specific ARNs instead of wildcards
+
+#### Enterprise Compliance
+- Define custom IAM roles with organization-specific policies
+- Include mandatory tags for cost allocation and compliance
+- Implement cross-account access controls for shared resources
+- Use AWS IAM Access Analyzer to validate permissions
+
+#### Security Monitoring
+- Enable CloudTrail for IAM policy changes
+- Monitor unusual API calls in CloudWatch
+- Implement alerting for permission errors
+- Regular audit of generated IAM policies
+
+### Troubleshooting IAM Issues
+
+#### Common Permission Errors
+1. **Agent can't invoke foundation models**: Check Bedrock service availability in region
+2. **Action group Lambda failures**: Verify Lambda resource-based policy exists
+3. **Knowledge base access denied**: Confirm agent-KB association exists
+4. **Cross-account access issues**: Review resource-based policies and trust relationships
+
+#### Debug Commands
+```bash
+# Check generated IAM policies
+aws iam get-role-policy --role-name bedrock-agent-{agent-name}-role --policy-name bedrock-agent-{agent-name}-policy
+
+# Verify Lambda resource policy
+aws lambda get-policy --function-name {function-name}
+
+# List agent permissions
+aws bedrock describe-agent --agent-id {agent-id}
+```
+
 ## Key Capabilities
 
 ### Dependency Management
@@ -847,6 +1445,249 @@ bedrock-forge now provides comprehensive management of Lambda function resource-
 - **Agent-Specific Security**: Each agent gets permissions only for Lambda functions it actually references, with source ARN restrictions
 - **Automatic Policy Generation**: Resource-based policies are created directly in the Lambda module, eliminating separate permission resources
 - **Optional Customization**: Advanced users can still add custom `resourcePolicy` statements for enterprise scenarios
+
+## Enterprise Validation Guide
+
+Bedrock Forge provides comprehensive enterprise-grade validation capabilities that enforce organizational standards for resource naming, tagging, and security compliance.
+
+### Validation Profiles
+
+#### Default Profile
+Development-friendly validation with basic checks:
+- Basic YAML syntax validation
+- Resource dependency validation
+- Simple naming pattern checks
+- Optional tagging requirements
+
+#### Enterprise Profile
+Production-ready validation with strict governance policies:
+- **Resource Naming Convention Enforcement**: Flexible regex patterns, team-specific rules, environment-aware naming
+- **Mandatory Tagging**: Cost allocation, compliance tracking, resource-specific requirements
+- **Security Policy Validation**: IAM policy scanning, Lambda security, agent security, network security
+- **Comprehensive Coverage**: All resource types with organizational standards
+
+#### Custom Profile
+User-defined validation rules via configuration file for organization-specific requirements.
+
+### Enterprise Validation Configuration
+
+#### Naming Convention Enforcement
+```yaml
+# validation.yml
+profiles:
+  enterprise:
+    naming:
+      patterns:
+        agent: "^[a-z][a-z0-9-]*-agent$"
+        lambda: "^[a-z][a-z0-9-]*-lambda$"
+        action_group: "^[a-z][a-z0-9-]*-ag$"
+      team_specific:
+        data_team: "^data-.*"
+        ml_team: "^ml-.*"
+```
+
+#### Mandatory Tagging
+```yaml
+# Required enterprise tags
+validation:
+  tagging:
+    required_tags:
+      - Environment    # Environment identifier
+      - Project        # Project name
+      - Owner          # Resource owner email
+      - CostCenter     # Cost allocation
+      - Team           # Organizational team
+      - BusinessUnit   # Business unit
+      - DataClassification  # Data sensitivity
+      - ComplianceLevel     # Compliance requirements
+    
+    patterns:
+      Owner: "^[a-z.]+@company\\.com$"
+      Environment: "^(dev|staging|prod)$"
+```
+
+#### Security Policy Validation
+```yaml
+validation:
+  security:
+    iam:
+      forbidden_actions:
+        - "*:*"
+        - "iam:*"
+        - "sts:AssumeRole"
+      require_mfa: true
+    
+    lambda:
+      require_vpc: true
+      max_timeout: 900
+      allowed_runtimes:
+        - "python3.11"
+        - "python3.12"
+        - "nodejs18.x"
+        - "nodejs20.x"
+    
+    agent:
+      require_guardrails: true
+      require_encryption: true
+      max_session_ttl: 3600
+```
+
+### Using Enterprise Validation
+
+#### Command Line Usage
+```bash
+# Use enterprise validation profile
+bedrock-forge validate . --profile enterprise
+
+# Use custom validation configuration
+bedrock-forge validate . --profile custom --config ./enterprise-validation.yml
+
+# Generate with enterprise validation
+bedrock-forge generate . ./terraform --profile enterprise
+```
+
+#### CI/CD Integration
+```yaml
+# .github/workflows/ci.yml
+name: Enterprise Validation
+on: [push, pull_request]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Bedrock Configurations
+        uses: ./.github/workflows/bedrock-forge-deploy.yml
+        with:
+          validation_only: true
+          validation_profile: enterprise
+          source_path: '.'
+```
+
+### Enterprise Tagging Examples
+
+#### Development Environment
+```yaml
+tags:
+  Environment: "dev"
+  Project: "customer-support-ai"
+  Owner: "john.doe@company.com"
+  CostCenter: "CC-123456"
+  Team: "ai-platform"
+  BusinessUnit: "engineering"
+  DataClassification: "internal"
+  ComplianceLevel: "standard"
+```
+
+#### Production Environment
+```yaml
+tags:
+  Environment: "prod"
+  Project: "customer-support-ai"
+  Owner: "ai-team@company.com"
+  CostCenter: "CC-789012"
+  Team: "ai-platform"
+  BusinessUnit: "engineering"
+  DataClassification: "confidential"
+  ComplianceLevel: "pci-dss"
+  BackupRequired: "true"
+  MonitoringLevel: "high"
+```
+
+### Security Best Practices
+
+#### Agent Security Requirements
+```yaml
+# Enterprise agent with security controls
+kind: Agent
+metadata:
+  name: "secure-customer-agent"
+spec:
+  foundationModel: "anthropic.claude-3-sonnet-20240229-v1:0"
+  instruction: "You are a secure customer support agent..."
+  
+  # Required: Guardrail for content safety
+  guardrail:
+    name: "enterprise-content-guardrail"
+    version: "2"
+    mode: "pre"
+  
+  # Required: Customer encryption key
+  customerEncryptionKey: "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+  
+  # Required: Session timeout limits
+  idleSessionTtlInSeconds: 1800  # 30 minutes max
+  
+  # Required: Memory configuration
+  memoryConfiguration:
+    enabledMemoryTypes: ["SESSION_SUMMARY"]
+    storageDays: 7  # Limited retention
+```
+
+#### Lambda Security Requirements
+```yaml
+# Enterprise Lambda with security controls
+kind: Lambda
+metadata:
+  name: "secure-order-processor"
+spec:
+  runtime: "python3.11"  # Approved runtime
+  handler: "app.handler"
+  timeout: 300  # Under enterprise limit
+  
+  # Required: VPC configuration
+  vpcConfig:
+    securityGroupIds: ["sg-12345678"]
+    subnetIds: ["subnet-12345678", "subnet-87654321"]
+  
+  # Required: Environment encryption
+  kmsKeyArn: "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+  
+  # Required: Dead letter queue
+  deadLetterConfig:
+    targetArn: "arn:aws:sqs:us-east-1:123456789012:dlq-queue"
+```
+
+### Validation Error Examples
+
+#### Naming Convention Violations
+```
+ERROR: Agent name 'CustomerSupport' violates naming convention
+Expected pattern: ^[a-z][a-z0-9-]*-agent$
+Suggestion: customer-support-agent
+```
+
+#### Missing Required Tags
+```
+ERROR: Missing required tags on resource 'customer-agent'
+Missing tags: Owner, CostCenter, ComplianceLevel
+Required for enterprise deployment
+```
+
+#### Security Policy Violations
+```
+ERROR: Lambda function timeout exceeds enterprise limit
+Current: 900 seconds, Maximum allowed: 600 seconds
+Update timeout or request security exception
+```
+
+### Multi-Environment Validation
+
+#### Development
+- **Relaxed Naming**: Flexible patterns for rapid iteration
+- **Optional Tags**: Basic tagging requirements
+- **Minimal Security**: Basic security controls
+
+#### Staging
+- **Stricter Naming**: Production-like naming patterns
+- **Required Tags**: Full tagging compliance
+- **Enhanced Security**: Production security controls
+
+#### Production
+- **Strict Naming**: Full enterprise naming compliance
+- **Mandatory Tags**: Complete cost allocation and compliance tags
+- **Maximum Security**: All security controls required, encryption mandatory
 
 ---
 

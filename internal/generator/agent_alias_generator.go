@@ -42,30 +42,6 @@ func (g *HCLGenerator) generateAgentAliases(body *hclwrite.Body, agentName strin
 			moduleBody.SetAttributeValue("description", cty.StringVal(alias.Description))
 		}
 
-		// Routing configuration
-		if len(alias.RoutingConfiguration) > 0 {
-			routingList := make([]cty.Value, 0, len(alias.RoutingConfiguration))
-
-			for _, routing := range alias.RoutingConfiguration {
-				routingValues := make(map[string]cty.Value)
-
-				if routing.AgentVersion != "" {
-					routingValues["agent_version"] = cty.StringVal(routing.AgentVersion)
-				} else {
-					// Default to DRAFT if no version specified
-					routingValues["agent_version"] = cty.StringVal("DRAFT")
-				}
-
-				if routing.ProvisionedThroughput != "" {
-					routingValues["provisioned_throughput"] = cty.StringVal(routing.ProvisionedThroughput)
-				}
-
-				routingList = append(routingList, cty.ObjectVal(routingValues))
-			}
-
-			moduleBody.SetAttributeValue("routing_configuration", cty.ListVal(routingList))
-		}
-
 		// Tags
 		if len(alias.Tags) > 0 {
 			tagValues := make(map[string]cty.Value)
