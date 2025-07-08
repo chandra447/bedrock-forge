@@ -326,7 +326,7 @@ func extractAgentNameFromId(agentId string) string {
 		withoutSuffix := strings.TrimSuffix(withoutPrefix, ".agent_id}")
 		return withoutSuffix
 	}
-	
+
 	// For direct ARNs or other formats, we can't reliably extract agent name
 	// In practice, standalone ActionGroups with direct agent ARNs won't be used
 	// for Lambda permission generation since we can't determine the agent name
