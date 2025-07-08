@@ -256,6 +256,13 @@ func (g *HCLGenerator) generateAgentModule(body *hclwrite.Body, resource models.
 
 	body.AppendNewline()
 
+	// Generate agent aliases if specified
+	if len(agent.Aliases) > 0 {
+		if err := g.generateAgentAliases(body, resource.Metadata.Name, agent.Aliases); err != nil {
+			return fmt.Errorf("failed to generate agent aliases: %w", err)
+		}
+	}
+
 	g.logger.WithField("agent", resource.Metadata.Name).Info("Generated agent module")
 	return nil
 }

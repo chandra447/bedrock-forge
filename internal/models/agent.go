@@ -17,6 +17,7 @@ type AgentSpec struct {
 	ActionGroups          []InlineActionGroup  `yaml:"actionGroups,omitempty"`
 	PromptOverrides       []PromptOverride     `yaml:"promptOverrides,omitempty"`
 	MemoryConfiguration   *MemoryConfiguration `yaml:"memoryConfiguration,omitempty"`
+	Aliases               []AgentAlias         `yaml:"aliases,omitempty"`
 }
 
 type GuardrailConfig struct {
@@ -48,4 +49,16 @@ type PromptOverride struct {
 type MemoryConfiguration struct {
 	EnabledMemoryTypes []string `yaml:"enabledMemoryTypes"`
 	StorageDays        int      `yaml:"storageDays,omitempty"`
+}
+
+type AgentAlias struct {
+	Name                 string            `yaml:"name"`
+	Description          string            `yaml:"description,omitempty"`
+	RoutingConfiguration []RoutingConfig   `yaml:"routingConfiguration,omitempty"`
+	Tags                 map[string]string `yaml:"tags,omitempty"`
+}
+
+type RoutingConfig struct {
+	AgentVersion          string `yaml:"agentVersion,omitempty"`
+	ProvisionedThroughput string `yaml:"provisionedThroughput,omitempty"`
 }
