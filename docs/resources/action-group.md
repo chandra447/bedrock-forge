@@ -14,10 +14,11 @@ metadata:
   name: "order-management"
   description: "Handle order lookups and updates"
 spec:
-  agentName: "customer-support"  # Reference to Agent resource
+  agentId: "${module.customer_support.agent_id}"  # Required: Agent ID reference
+  agentVersion: "DRAFT"                            # Optional: Agent version (defaults to DRAFT)
   description: "Provides order lookup and management capabilities"
   
-  # Lambda executor
+  # Required: Action group executor
   actionGroupExecutor:
     lambda: "order-lookup-lambda"  # Reference to Lambda resource
   
@@ -41,13 +42,15 @@ metadata:
   name: "customer-tools"
   description: "Comprehensive customer management tools"
 spec:
-  agentName: "customer-support"
+  agentId: "${module.customer_support.agent_id}"  # Required: Agent ID (module reference)
+  # agentId: "arn:aws:bedrock:us-east-1:123456789012:agent/ABCD1234"  # OR direct ARN
+  agentVersion: "1"                                # Optional: Specific version for production
   description: "Customer support tools for order management and account operations"
   
-  # Can reference local Lambda or external ARN
+  # Required: Action group executor (can reference local Lambda or external ARN)
   actionGroupExecutor:
-    lambda: "customer-tools-lambda"
-    # OR use external Lambda ARN
+    lambda: "customer-tools-lambda"  # Reference to Lambda defined in same project
+    # OR use external Lambda ARN for shared functions:
     # lambdaArn: "arn:aws:lambda:us-east-1:123456789012:function:external-function"
   
   # Define available functions
@@ -117,16 +120,18 @@ spec:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `agentName` | string | Name of the associated Agent resource |
+| `agentId` | string | Agent ID (module reference or direct ARN) |
 | `actionGroupExecutor` | object | Lambda function configuration |
 
 ### Optional Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `agentVersion` | string | Agent version (defaults to "DRAFT") |
 | `description` | string | Description of the action group |
 | `functionSchema` | object | Function definitions and parameters |
 | `apiSchema` | object | OpenAPI schema (alternative to functionSchema) |
+| `skipResourceInUseCheck` | boolean | Skip resource in use check |
 | `tags` | object | Resource tags |
 
 ### Action Group Executor
@@ -186,7 +191,7 @@ kind: ActionGroup
 metadata:
   name: "order-actions"
 spec:
-  agentName: "customer-agent"
+  agentId: "${module.customer_agent.agent_id}"  # References agent module
   actionGroupExecutor:
     lambda: "order-tools"  # References Lambda above
 ```
@@ -198,7 +203,8 @@ kind: ActionGroup
 metadata:
   name: "external-actions"
 spec:
-  agentName: "customer-agent"
+  agentId: "arn:aws:bedrock:us-east-1:123456789012:agent/ABCD1234"  # Direct agent ARN
+  agentVersion: "1"  # Use specific version for production
   actionGroupExecutor:
     lambdaArn: "arn:aws:lambda:us-east-1:123456789012:function:existing-function"
 ```
@@ -289,7 +295,7 @@ kind: ActionGroup
 metadata:
   name: "api-actions"
 spec:
-  agentName: "customer-agent"
+  agentId: "${module.customer_agent.agent_id}"  # Required: Agent ID reference
   actionGroupExecutor:
     lambda: "api-lambda"
   
@@ -364,7 +370,7 @@ kind: ActionGroup
 metadata:
   name: "order-tools"
 spec:
-  agentName: "customer-agent"
+  agentId: "${module.customer_agent.agent_id}"  # References agent module
   actionGroupExecutor:
     lambda: "order-lambda"
   functionSchema:

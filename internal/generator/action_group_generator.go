@@ -48,21 +48,18 @@ func (g *HCLGenerator) generateActionGroupModule(body *hclwrite.Body, resource m
 	// Set basic attributes
 	moduleBody.SetAttributeValue("action_group_name", cty.StringVal(resource.Metadata.Name))
 
-	// Set agent reference
-	if actionGroup.AgentId != "" {
-		// Direct agent ID provided
-		moduleBody.SetAttributeValue("agent_id", cty.StringVal(actionGroup.AgentId))
-	} else if actionGroup.AgentName != "" {
-		// Reference to agent by name - use module output
-		if g.registry.HasResource(models.AgentKind, actionGroup.AgentName) {
-			agentName := g.sanitizeResourceName(actionGroup.AgentName)
-			moduleBody.SetAttributeValue("agent_id", cty.StringVal(fmt.Sprintf("${module.%s.agent_id}", agentName)))
-		} else {
-			return fmt.Errorf("action group %s references non-existent agent %s", resource.Metadata.Name, actionGroup.AgentName)
-		}
-	} else {
-		return fmt.Errorf("action group %s must specify either agentId or agentName", resource.Metadata.Name)
+	// Set required agent_id
+	if actionGroup.AgentId == "" {
+		return fmt.Errorf("action group %s must specify agentId", resource.Metadata.Name)
 	}
+	moduleBody.SetAttributeValue("agent_id", cty.StringVal(actionGroup.AgentId))
+
+	// Set agent_version (defaults to DRAFT if not specified)
+	agentVersion := actionGroup.AgentVersion
+	if agentVersion == "" {
+		agentVersion = "DRAFT"
+	}
+	moduleBody.SetAttributeValue("agent_version", cty.StringVal(agentVersion))
 
 	// Optional description
 	if actionGroup.Description != "" {
@@ -79,8 +76,16 @@ func (g *HCLGenerator) generateActionGroupModule(body *hclwrite.Body, resource m
 		moduleBody.SetAttributeValue("action_group_state", cty.StringVal(actionGroup.ActionGroupState))
 	}
 
-	// Action group executor
-	if actionGroup.ActionGroupExecutor != nil {
+	// Skip resource in use check
+	if actionGroup.SkipResourceInUseCheck {
+		moduleBody.SetAttributeValue("skip_resource_in_use_check", cty.BoolVal(true))
+	}
+
+	// Action group executor (required)
+	if actionGroup.ActionGroupExecutor == nil {
+		return fmt.Errorf("action group %s must specify actionGroupExecutor", resource.Metadata.Name)
+	}
+	{
 		executorValues := make(map[string]cty.Value)
 
 		// Handle Lambda reference (either local resource or existing ARN)
@@ -192,6 +197,15 @@ func (g *HCLGenerator) generateActionGroupModule(body *hclwrite.Body, resource m
 		moduleBody.SetAttributeValue("function_schema", cty.ObjectVal(map[string]cty.Value{
 			"functions": cty.ListVal(functionList),
 		}))
+	}
+
+	// Tags
+	if len(actionGroup.Tags) > 0 {
+		tagValues := make(map[string]cty.Value)
+		for key, value := range actionGroup.Tags {
+			tagValues[key] = cty.StringVal(value)
+		}
+		moduleBody.SetAttributeValue("tags", cty.ObjectVal(tagValues))
 	}
 
 	body.AppendNewline()

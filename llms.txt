@@ -24,7 +24,7 @@ Bedrock Forge is an enterprise platform that transforms YAML configurations into
 ## Supported Resources
 
 **AWS Bedrock Resources:**
-- **Agent**: Bedrock conversational agents with foundation models, instructions, and inline action groups
+- **Agent**: Bedrock conversational agents with foundation models, instructions, inline action groups, and deployment aliases
 - **Lambda**: AWS Lambda functions for action groups with runtime and environment settings
 - **ActionGroup**: Agent action capabilities with API schemas and executors (requires agent association)
 - **KnowledgeBase**: Vector knowledge bases with embeddings and data sources
@@ -801,13 +801,15 @@ The Prompt resource has been significantly enhanced to support all AWS Bedrock T
 1. **Dual Template Types**: TEXT (simple prompts) and CHAT (conversational with tools)
 2. **Variable Management**: Proper scope and validation for prompt variables
 3. **Function Calling**: Complete tool configuration with auto/any/specific tool choices
-4. **Security**: Optional KMS encryption for sensitive enterprise prompts
-5. **Backward Compatibility**: Existing TEXT prompts continue to work unchanged
+4. **Agent Association**: Direct integration with agents via genAiResource configuration
+5. **Security**: Optional KMS encryption for sensitive enterprise prompts
+6. **Backward Compatibility**: Existing TEXT prompts continue to work unchanged
 
 **Use Cases:**
 - **TEXT Templates**: Simple prompts with variable substitution for agent orchestration
 - **CHAT Templates**: Complex conversational agents with tool access and multi-turn dialogs
 - **Function Calling**: Agents that can call external APIs, search knowledge bases, or execute actions
+- **Agent Integration**: Prompts directly associated with specific agents for consistent behavior
 - **Enterprise Security**: Encrypted prompts for sensitive business logic and proprietary instructions
 
 **Migration Path:**
