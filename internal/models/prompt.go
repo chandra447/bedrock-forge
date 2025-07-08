@@ -25,6 +25,19 @@ type PromptVariant struct {
 	TemplateType           string                  `yaml:"templateType"` // "TEXT" or "CHAT"
 	TemplateConfiguration  *TemplateConfiguration  `yaml:"templateConfiguration,omitempty"`
 	InferenceConfiguration *InferenceConfiguration `yaml:"inferenceConfiguration,omitempty"`
+	GenAiResource          *GenAiResourceConfig    `yaml:"genAiResource,omitempty"`
+}
+
+type GenAiResourceConfig struct {
+	Agent *AgentResourceConfig `yaml:"agent,omitempty"`
+}
+
+type AgentResourceConfig struct {
+	// Reference to an agent YAML config in the same project
+	AgentName string `yaml:"agentName,omitempty"`
+
+	// Direct ARN reference to an existing deployed agent
+	AgentArn string `yaml:"agentArn,omitempty"`
 }
 
 type TemplateConfiguration struct {

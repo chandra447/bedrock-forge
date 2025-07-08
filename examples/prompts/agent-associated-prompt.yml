@@ -1,0 +1,84 @@
+kind: Prompt
+metadata:
+  name: "agent-associated-prompt"
+  description: "Prompt associated with an agent for consistent behavior"
+spec:
+  description: "Custom prompt that's directly associated with an agent for consistent responses"
+  defaultVariant: "agent-specific"
+  
+  # Input variables for dynamic content
+  inputVariables:
+    - name: "user_query"
+    - name: "context"
+  
+  variants:
+    # Variant associated with an agent defined in the same project
+    - name: "agent-specific"
+      modelId: "anthropic.claude-3-sonnet-20240229-v1:0"
+      templateType: "TEXT"
+      
+      # Associate this prompt variant with an agent
+      genAiResource:
+        agent:
+          agentName: "customer-support"  # Reference to agent YAML in same project
+      
+      templateConfiguration:
+        text:
+          text: |
+            You are a customer support agent specialized in helping customers with their questions.
+            
+            Customer Query: {{user_query}}
+            Additional Context: {{context}}
+            
+            Please provide a helpful, accurate, and professional response. Always maintain a friendly tone
+            and offer additional assistance when appropriate.
+          
+          inputVariables:
+            - name: "user_query"
+            - name: "context"
+      
+      inferenceConfiguration:
+        text:
+          temperature: 0.3
+          topP: 0.8
+          maxTokens: 256
+    
+    # Variant associated with an existing deployed agent (via ARN)
+    - name: "external-agent"
+      modelId: "anthropic.claude-3-sonnet-20240229-v1:0"
+      templateType: "TEXT"
+      
+      # Associate with an existing deployed agent
+      genAiResource:
+        agent:
+          agentArn: "arn:aws:bedrock:us-east-1:123456789012:agent/ABCDEFGHIJ"
+      
+      templateConfiguration:
+        text:
+          text: |
+            You are integrated with an external agent system.
+            
+            Query: {{user_query}}
+            Context: {{context}}
+            
+            Provide responses that align with the external agent's capabilities and constraints.
+          
+          inputVariables:
+            - name: "user_query"
+            - name: "context"
+      
+      inferenceConfiguration:
+        text:
+          temperature: 0.2
+          topP: 0.9
+          maxTokens: 512
+
+  tags:
+    # Required enterprise tags
+    Environment: "dev"
+    Project: "customer-support"
+    Owner: "team@company.com"
+    # Prompt-specific tags
+    AssociatedAgent: "customer-support"
+    PromptType: "agent-integrated"
+    Purpose: "customer-service"

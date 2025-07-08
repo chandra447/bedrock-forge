@@ -211,6 +211,65 @@ spec:
     Team: "ai-platform"
 ```
 
+## Agent Association
+
+Prompts can be directly associated with agents using the `genAiResource` configuration. This enables tight integration between prompts and specific agents.
+
+### Agent Reference (Same Project)
+
+```yaml
+kind: Prompt
+metadata:
+  name: "agent-integrated-prompt"
+spec:
+  description: "Prompt associated with an agent"
+  defaultVariant: "agent-specific"
+  
+  variants:
+    - name: "agent-specific"
+      modelId: "anthropic.claude-3-sonnet-20240229-v1:0"
+      templateType: "TEXT"
+      
+      # Associate with agent defined in same project
+      genAiResource:
+        agent:
+          agentName: "customer-support"  # References agent YAML
+      
+      templateConfiguration:
+        text:
+          text: |
+            You are integrated with the customer support agent.
+            Query: {{user_query}}
+            Please provide consistent responses.
+          inputVariables:
+            - name: "user_query"
+```
+
+### External Agent ARN
+
+```yaml
+variants:
+  - name: "external-agent"
+    modelId: "anthropic.claude-3-sonnet-20240229-v1:0"
+    templateType: "TEXT"
+    
+    # Associate with existing deployed agent
+    genAiResource:
+      agent:
+        agentArn: "arn:aws:bedrock:us-east-1:123456789012:agent/ABCDEFGHIJ"
+    
+    templateConfiguration:
+      text:
+        text: "Prompt content here..."
+```
+
+### Agent Association Benefits
+
+- **Consistency**: Ensures prompts align with agent behavior
+- **Integration**: Direct connection between prompts and agents
+- **Governance**: Clear relationship tracking for compliance
+- **Deployment**: Automatic dependency management
+
 ## Specification
 
 ### Required Fields

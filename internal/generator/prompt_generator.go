@@ -101,6 +101,15 @@ func (g *HCLGenerator) generatePromptModule(body *hclwrite.Body, resource models
 				variantValues["inference_configuration"] = inferenceConfig
 			}
 
+			// Gen AI Resource configuration
+			if variant.GenAiResource != nil {
+				genAiConfig, err := g.generateGenAiResourceConfiguration(variant.GenAiResource)
+				if err != nil {
+					return fmt.Errorf("failed to generate gen AI resource configuration: %w", err)
+				}
+				variantValues["gen_ai_resource"] = genAiConfig
+			}
+
 			variantsList = append(variantsList, cty.ObjectVal(variantValues))
 		}
 
@@ -302,4 +311,36 @@ func (g *HCLGenerator) generateInferenceConfiguration(inferenceConfig *models.In
 	}
 
 	return cty.ObjectVal(inferenceValues), nil
+}
+
+// generateGenAiResourceConfiguration generates gen AI resource configuration for prompt variants
+func (g *HCLGenerator) generateGenAiResourceConfiguration(genAiConfig *models.GenAiResourceConfig) (cty.Value, error) {
+	genAiValues := make(map[string]cty.Value)
+
+	if genAiConfig.Agent != nil {
+		agentValues := make(map[string]cty.Value)
+
+		if genAiConfig.Agent.AgentName != "" {
+			// Reference to an agent YAML config in the same project
+			if g.registry.HasResource(models.AgentKind, genAiConfig.Agent.AgentName) {
+				agentResourceName := g.sanitizeResourceName(genAiConfig.Agent.AgentName)
+				agentValues["agent_identifier"] = cty.StringVal(fmt.Sprintf("${module.%s.agent_id}", agentResourceName))
+
+				g.logger.WithField("prompt_agent", genAiConfig.Agent.AgentName).Debug("Generated agent reference for prompt variant")
+			} else {
+				return cty.NilVal, fmt.Errorf("referenced agent '%s' not found in registry", genAiConfig.Agent.AgentName)
+			}
+		} else if genAiConfig.Agent.AgentArn != "" {
+			// Direct ARN reference to an existing deployed agent
+			agentValues["agent_identifier"] = cty.StringVal(genAiConfig.Agent.AgentArn)
+
+			g.logger.WithField("prompt_agent_arn", genAiConfig.Agent.AgentArn).Debug("Generated agent ARN reference for prompt variant")
+		} else {
+			return cty.NilVal, fmt.Errorf("agent configuration must specify either agentName or agentArn")
+		}
+
+		genAiValues["agent"] = cty.ObjectVal(agentValues)
+	}
+
+	return cty.ObjectVal(genAiValues), nil
 }
