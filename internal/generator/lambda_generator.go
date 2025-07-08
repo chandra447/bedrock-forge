@@ -3,6 +3,7 @@ package generator
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/zclconf/go-cty/cty"
@@ -290,8 +291,12 @@ func (g *HCLGenerator) findAgentsReferencingLambda(lambdaName string) []string {
 		if actionGroup, ok := resource.Resource.(*models.ActionGroup); ok {
 			if actionGroup.Spec.ActionGroupExecutor != nil && actionGroup.Spec.ActionGroupExecutor.Lambda == lambdaName {
 				// For standalone action groups, we need to find the agent they belong to
-				if actionGroup.Spec.AgentName != "" {
-					referencingAgents = append(referencingAgents, actionGroup.Spec.AgentName)
+				// Parse agentId to extract agent name if it's a module reference
+				if actionGroup.Spec.AgentId != "" {
+					agentName := extractAgentNameFromId(actionGroup.Spec.AgentId)
+					if agentName != "" {
+						referencingAgents = append(referencingAgents, agentName)
+					}
 				}
 			}
 		}
@@ -308,4 +313,22 @@ func (g *HCLGenerator) findAgentsReferencingLambda(lambdaName string) []string {
 	}
 
 	return uniqueAgents
+}
+
+// extractAgentNameFromId extracts the agent name from an agentId field
+// Handles module references like "${module.agent_name.agent_id}" and returns the agent name
+// For direct ARNs, returns empty string since we can't extract agent name
+func extractAgentNameFromId(agentId string) string {
+	// Check if it's a module reference: ${module.agent_name.agent_id}
+	if strings.HasPrefix(agentId, "${module.") && strings.HasSuffix(agentId, ".agent_id}") {
+		// Extract agent name from ${module.agent_name.agent_id}
+		withoutPrefix := strings.TrimPrefix(agentId, "${module.")
+		withoutSuffix := strings.TrimSuffix(withoutPrefix, ".agent_id}")
+		return withoutSuffix
+	}
+	
+	// For direct ARNs or other formats, we can't reliably extract agent name
+	// In practice, standalone ActionGroups with direct agent ARNs won't be used
+	// for Lambda permission generation since we can't determine the agent name
+	return ""
 }
