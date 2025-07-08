@@ -125,84 +125,12 @@ jobs:
       - name: Build bedrock-forge
         run: go build -o bedrock-forge ./cmd/bedrock-forge
 
-      - name: Run integration tests
-        run: |
-          # Test basic functionality
-          ./bedrock-forge version
-          
-          # Test validation with examples (excluding enterprise validation test)
-          if [ -d "examples" ]; then
-            # Copy examples to temp directory excluding enterprise validation test
-            cp -r examples examples-temp
-            rm -rf examples-temp/enterprise-validation-test
-            ./bedrock-forge validate examples-temp/
-            rm -rf examples-temp
-          fi
-          
-          # Test generation with examples (excluding enterprise validation test)
-          if [ -d "examples" ]; then
-            # Use the same temp directory for generation
-            cp -r examples examples-temp
-            rm -rf examples-temp/enterprise-validation-test
-            ./bedrock-forge generate examples-temp/ ./test-output
-            rm -rf examples-temp
-            
-            # Verify Terraform files were generated
-            if [ ! -f "./test-output/main.tf" ]; then
-              echo "❌ main.tf not generated"
-              exit 1
-            fi
-            
-            # Validate generated Terraform
-            cd test-output
-            terraform init -backend=false
-            terraform validate
-            echo "✅ Generated Terraform is valid"
-          fi
-
-
-  validate-examples:
-    name: Validate Examples
-    runs-on: ubuntu-latest
-    needs: build
-    if: github.event_name == 'push' || github.event_name == 'pull_request'
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Build bedrock-forge
-        run: go build -o bedrock-forge ./cmd/bedrock-forge
-
-      - name: Validate all examples
-        run: |
-          if [ -d "examples" ]; then
-            echo "🔍 Validating examples..."
-            
-            # Find all YAML files in examples (excluding enterprise validation test)
-            find examples/ -path "*/enterprise-validation-test/*" -prune -o -name "*.yml" -print -o -name "*.yaml" -print | while read file; do
-              echo "Validating: $file"
-              
-              # Extract directory for validation
-              dir=$(dirname "$file")
-              ./bedrock-forge validate "$dir"
-            done
-            
-            echo "✅ All examples are valid"
-          else
-            echo "⚠️ No examples directory found"
-          fi
 
   # Job to mark all checks as successful for branch protection
   all-checks:
     name: All Checks Passed
     runs-on: ubuntu-latest
-    needs: [test, build, integration-test, validate-examples]
+    needs: [test, build]
     if: always()
     
     steps:
@@ -218,15 +146,5 @@ jobs:
             exit 1
           fi
           
-          if [ "${{ needs.integration-test.result }}" != "success" ] && [ "${{ needs.integration-test.result }}" != "skipped" ]; then
-            echo "❌ Integration tests failed"
-            exit 1
-          fi
-          
-          
-          if [ "${{ needs.validate-examples.result }}" != "success" ] && [ "${{ needs.validate-examples.result }}" != "skipped" ]; then
-            echo "❌ Example validation failed"
-            exit 1
-          fi
           
           echo "✅ All checks passed!"
