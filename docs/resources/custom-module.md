@@ -1,4 +1,6 @@
-# Custom Module Resource
+# Custom Module Resource (Deprecated)
+
+⚠️ **DEPRECATED**: This resource type has been replaced with `CustomResources`. See [custom-resources.md](./custom-resources.md) for the new approach.
 
 Integration with existing Terraform modules alongside Bedrock resources for comprehensive infrastructure deployment.
 
