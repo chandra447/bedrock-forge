@@ -146,6 +146,13 @@ func (p *YAMLParser) parseDocument(content []byte, filePath string, docIndex int
 		}
 		parsedResource.Resource = &iamRole
 
+	case models.CustomResourcesKind:
+		var customResources models.CustomResources
+		if err := yaml.Unmarshal(content, &customResources); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal CustomResources: %w", err)
+		}
+		parsedResource.Resource = &customResources
+
 	case models.CustomModuleKind:
 		var customModule models.CustomModule
 		if err := yaml.Unmarshal(content, &customModule); err != nil {
@@ -191,6 +198,8 @@ func (p *YAMLParser) ValidateResource(resource *ParsedResource) error {
 		return p.validatePrompt(resource.Resource.(*models.Prompt))
 	case models.IAMRoleKind:
 		return p.validateIAMRole(resource.Resource.(*models.IAMRole))
+	case models.CustomResourcesKind:
+		return p.validateCustomResources(resource.Resource.(*models.CustomResources))
 	case models.CustomModuleKind:
 		return p.validateCustomModule(resource.Resource.(*models.CustomModule))
 	case models.OpenSearchServerlessKind:
@@ -278,6 +287,18 @@ func (p *YAMLParser) validateIAMRole(iamRole *models.IAMRole) error {
 	if len(iamRole.Spec.AssumeRolePolicy.Statement) == 0 {
 		return fmt.Errorf("IAM role assumeRolePolicy must have at least one statement")
 	}
+	return nil
+}
+
+func (p *YAMLParser) validateCustomResources(customResources *models.CustomResources) error {
+	if customResources.Spec.Path == "" && len(customResources.Spec.Files) == 0 {
+		return fmt.Errorf("custom resources must specify either 'path' or 'files'")
+	}
+	
+	if customResources.Spec.Path != "" && len(customResources.Spec.Files) > 0 {
+		return fmt.Errorf("custom resources cannot specify both 'path' and 'files' - use one or the other")
+	}
+	
 	return nil
 }
 
