@@ -1,0 +1,19 @@
+# Example: Agent that uses custom resources for notifications
+kind: Agent
+metadata:
+  name: notification-agent
+  description: Agent that sends notifications via custom SNS topic
+spec:
+  foundationModel: "anthropic.claude-3-haiku-20240307-v1:0"
+  instruction: |
+    You are a helpful customer service agent that processes customer inquiries
+    and sends notifications about important events.
+  
+  # Reference custom resources created by the CustomResources YAML
+  environment:
+    SNS_TOPIC_ARN: "${aws_sns_topic.agent_notifications.arn}"
+    EVENTBRIDGE_RULE: "${aws_cloudwatch_event_rule.agent_events.name}"
+  
+  # Dependencies ensure custom resources are created first
+  dependsOn:
+    - infrastructure  # References the CustomResources metadata.name

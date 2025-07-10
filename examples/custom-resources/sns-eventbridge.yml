@@ -1,0 +1,17 @@
+# Example: Custom AWS resources using user's .tf files
+kind: CustomResources
+metadata:
+  name: infrastructure
+  description: SNS topic and EventBridge for agent notifications
+spec:
+  # Path to directory containing .tf files
+  path: "./terraform/"
+  
+  # Variables to pass to the Terraform configuration
+  variables:
+    environment: "${var.environment}"
+    project_name: "bedrock-agent"
+    sns_topic_name: "agent-notifications"
+    eventbridge_rule_name: "agent-events"
+  
+  description: "SNS topic and EventBridge for handling agent notifications and events"

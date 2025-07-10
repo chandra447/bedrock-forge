@@ -1,6 +1,8 @@
-# Custom Module Examples
+# Custom Modules (Deprecated)
 
-This directory contains examples of how to use the `CustomModule` resource kind to include your own Terraform modules alongside Bedrock resources.
+⚠️ **DEPRECATED**: This approach has been replaced with `CustomResources`.
+
+This directory contains examples of the old `CustomModule` approach which used external Terraform modules and registries.
 
 ## Overview
 
@@ -117,3 +119,47 @@ module "bedrock_opensearch" {
   depends_on = [module.bedrock_vpc]
 }
 ```
+
+## New Approach: CustomResources
+
+Instead of using external modules, use `CustomResources` to include your own `.tf` files:
+
+```yaml
+# Old approach (deprecated)
+kind: CustomModule
+metadata:
+  name: vpc
+spec:
+  source: "terraform-aws-modules/vpc/aws"
+  version: "5.0.0"
+  variables: {...}
+
+# New approach (recommended)  
+kind: CustomResources
+metadata:
+  name: infrastructure
+spec:
+  path: "./terraform/"     # Your own .tf files
+  variables: {...}
+```
+
+## Migration
+
+To migrate from CustomModule to CustomResources:
+
+1. Create your own `.tf` files with the resources you need
+2. Change `kind: CustomModule` to `kind: CustomResources`
+3. Change `source:` to `path:` pointing to your `.tf` files
+4. Remove `version:` field (not needed for local files)
+
+See `examples/custom-resources/` for the new examples.
+
+## Why the change?
+
+- **Better integration**: Your `.tf` files become part of the single deployment
+- **Cross-references**: Easily reference your resources in agent YAML files  
+- **Simpler**: No external dependencies or version management
+- **Flexible**: Use any Terraform syntax and AWS resource you need
+- **Unified**: Everything deploys together with proper dependency management
+
+The new `CustomResources` approach aligns with the original vision of letting users write their own Terraform files and reference them in bedrock-forge YAML configurations.

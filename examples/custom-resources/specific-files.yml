@@ -1,0 +1,19 @@
+# Example: Custom AWS resources using specific .tf files
+kind: CustomResources
+metadata:
+  name: vpc-and-security
+  description: VPC and security group resources
+spec:
+  # List of specific .tf files to include
+  files:
+    - "vpc.tf"
+    - "security-groups.tf"
+    - "variables.tf"
+  
+  # Variables to pass to the Terraform configuration
+  variables:
+    vpc_cidr: "10.0.0.0/16"
+    environment: "${var.environment}"
+    availability_zones: ["us-east-1a", "us-east-1b"]
+  
+  description: "VPC and security group infrastructure for Lambda functions"
