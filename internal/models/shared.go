@@ -11,7 +11,8 @@ const (
 	PromptKind                        ResourceKind = "Prompt"
 	IAMRoleKind                       ResourceKind = "IAMRole"
 	AgentKnowledgeBaseAssociationKind ResourceKind = "AgentKnowledgeBaseAssociation"
-	CustomModuleKind                  ResourceKind = "CustomModule"
+	CustomResourcesKind               ResourceKind = "CustomResources"
+	CustomModuleKind                  ResourceKind = "CustomModule" // Deprecated: Use CustomResourcesKind
 	OpenSearchServerlessKind          ResourceKind = "OpenSearchServerless"
 )
 
