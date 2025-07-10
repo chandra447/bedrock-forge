@@ -106,8 +106,9 @@ func (g *HCLGenerator) buildDependencyOrder() ([]models.ResourceKind, error) {
 	// Agents depend on everything else
 
 	order := []models.ResourceKind{
-		models.IAMRoleKind,      // IAM roles must be created first
-		models.CustomModuleKind, // Custom modules can be created early
+		models.IAMRoleKind,              // IAM roles must be created first
+		models.CustomResourcesKind,      // Custom resources (user .tf files) can be created early
+		models.CustomModuleKind,         // Custom modules can be created early (deprecated)
 		models.GuardrailKind,
 		models.PromptKind,
 		models.LambdaKind,
@@ -137,6 +138,8 @@ func (g *HCLGenerator) generateModuleCall(body *hclwrite.Body, resource models.B
 		return g.generatePromptModule(body, resource)
 	case models.IAMRoleKind:
 		return g.generateIAMRoleModule(body, resource)
+	case models.CustomResourcesKind:
+		return g.generateCustomResourcesModule(body, resource)
 	case models.CustomModuleKind:
 		return g.generateCustomModuleModule(body, resource)
 	case models.OpenSearchServerlessKind:
