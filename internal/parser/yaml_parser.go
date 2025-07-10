@@ -294,11 +294,11 @@ func (p *YAMLParser) validateCustomResources(customResources *models.CustomResou
 	if customResources.Spec.Path == "" && len(customResources.Spec.Files) == 0 {
 		return fmt.Errorf("custom resources must specify either 'path' or 'files'")
 	}
-	
+
 	if customResources.Spec.Path != "" && len(customResources.Spec.Files) > 0 {
 		return fmt.Errorf("custom resources cannot specify both 'path' and 'files' - use one or the other")
 	}
-	
+
 	return nil
 }
 
