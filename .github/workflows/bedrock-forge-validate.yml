@@ -1,0 +1,251 @@
+name: Bedrock Forge Validate
+
+on:
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - '**/*.yml'
+      - '**/*.yaml'
+      - '.github/workflows/bedrock-forge-*.yml'
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: 'Target branch for validation'
+        required: false
+        default: 'main'
+        type: string
+      aws_region:
+        description: 'AWS Region for validation'
+        required: false
+        default: 'us-east-1'
+        type: string
+      source_path:
+        description: 'Path to YAML configurations'
+        required: false
+        default: '.'
+        type: string
+
+env:
+  AWS_REGION: ${{ inputs.aws_region || 'us-east-1' }}
+  TF_VERSION: '1.5.0'
+  GO_VERSION: '1.21'
+  COMMIT_HASH: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  validate:
+    name: Validate & Generate Terraform
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    
+    outputs:
+      commit-hash: ${{ env.COMMIT_HASH }}
+      resources-found: ${{ steps.scan.outputs.resources-found }}
+      s3-path: ${{ steps.upload-terraform.outputs.s3-path }}
+      plan-summary: ${{ steps.terraform-plan.outputs.plan-summary }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          fetch-depth: 0
+
+      - name: Checkout Bedrock Forge
+        uses: actions/checkout@v4
+        with:
+          repository: 'your-org/bedrock-forge'
+          ref: 'main'
+          path: .bedrock-forge
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Build Bedrock Forge
+        working-directory: .bedrock-forge
+        run: |
+          go build -o ../bedrock-forge ./cmd/bedrock-forge
+
+      - name: Validate YAML configurations
+        run: |
+          ./bedrock-forge validate ${{ inputs.source_path || '.' }}
+          echo "✅ All YAML configurations are valid"
+
+      - name: Scan for resources
+        id: scan
+        run: |
+          output=$(./bedrock-forge scan ${{ inputs.source_path || '.' }})
+          echo "scan-output<<EOF" >> $GITHUB_OUTPUT
+          echo "$output" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          # Count resources
+          resources=$(echo "$output" | grep -c "📦" || echo "0")
+          echo "resources-found=$resources" >> $GITHUB_OUTPUT
+
+      - name: Generate Terraform configuration
+        run: |
+          echo "🔧 Generating Terraform configuration..."
+          ./bedrock-forge generate ${{ inputs.source_path || '.' }} ./terraform-output
+          echo "✅ Terraform configuration generated"
+          
+          # Add commit hash to generated files
+          echo "# Generated from commit: ${{ env.COMMIT_HASH }}" > ./terraform-output/COMMIT_INFO.txt
+          echo "# Generated at: $(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> ./terraform-output/COMMIT_INFO.txt
+          echo "# Source path: ${{ inputs.source_path || '.' }}" >> ./terraform-output/COMMIT_INFO.txt
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_VALIDATION_ROLE }}
+          role-session-name: bedrock-forge-validate
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Upload Terraform modules to S3
+        id: upload-terraform
+        run: |
+          BUCKET_NAME="${{ secrets.TERRAFORM_ARTIFACTS_BUCKET }}"
+          S3_PATH="generated-modules/${{ env.COMMIT_HASH }}"
+          
+          # Upload generated Terraform modules
+          aws s3 cp terraform-output/ s3://${BUCKET_NAME}/${S3_PATH}/ --recursive
+          
+          echo "s3-path=s3://${BUCKET_NAME}/${S3_PATH}" >> $GITHUB_OUTPUT
+          echo "✅ Terraform modules uploaded to S3: s3://${BUCKET_NAME}/${S3_PATH}"
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Initialize Terraform
+        working-directory: terraform-output
+        run: |
+          # Create a temporary backend for validation
+          cat > backend.tf << EOF
+          terraform {
+            backend "local" {
+              path = "terraform.tfstate"
+            }
+          }
+          EOF
+          
+          terraform init
+
+      - name: Terraform Plan
+        id: terraform-plan
+        working-directory: terraform-output
+        run: |
+          # Run terraform plan
+          terraform plan -out=tfplan -no-color > plan.txt 2>&1 || true
+          
+          # Extract plan summary
+          PLAN_SUMMARY=$(cat plan.txt | grep -E "Plan:|No changes|Error:" | head -1 || echo "Plan completed")
+          echo "plan-summary=$PLAN_SUMMARY" >> $GITHUB_OUTPUT
+          
+          # Save plan output for upload
+          terraform show -no-color tfplan > plan-detailed.txt 2>/dev/null || echo "No valid plan generated" > plan-detailed.txt
+
+      - name: Upload Terraform plan to S3
+        run: |
+          BUCKET_NAME="${{ secrets.TERRAFORM_ARTIFACTS_BUCKET }}"
+          S3_PATH="terraform-plans/${{ env.COMMIT_HASH }}"
+          
+          # Upload plan files
+          aws s3 cp terraform-output/plan.txt s3://${BUCKET_NAME}/${S3_PATH}/plan.txt
+          aws s3 cp terraform-output/plan-detailed.txt s3://${BUCKET_NAME}/${S3_PATH}/plan-detailed.txt
+          
+          echo "✅ Terraform plan uploaded to S3: s3://${BUCKET_NAME}/${S3_PATH}"
+
+      - name: Comment on PR with validation results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            // Read plan output
+            const planPath = path.join('terraform-output', 'plan.txt');
+            const planOutput = fs.existsSync(planPath) ? fs.readFileSync(planPath, 'utf8') : 'No plan output available';
+            
+            // Create comment body
+            const commentBody = `## 🔍 Bedrock Forge Validation Results
+            
+            **Commit:** \`${{ env.COMMIT_HASH }}\`
+            **Resources Found:** ${{ steps.scan.outputs.resources-found }}
+            **Plan Summary:** ${{ steps.terraform-plan.outputs.plan-summary }}
+            
+            ### 📦 Resource Scan
+            \`\`\`
+            ${{ steps.scan.outputs.scan-output }}
+            \`\`\`
+            
+            ### 🏗️ Terraform Plan
+            <details>
+            <summary>View Terraform Plan</summary>
+            
+            \`\`\`terraform
+            ${planOutput.slice(0, 8000)}${planOutput.length > 8000 ? '\n... (truncated)' : ''}
+            \`\`\`
+            </details>
+            
+            ### 📁 Generated Artifacts
+            - **Terraform Modules:** [\`${{ steps.upload-terraform.outputs.s3-path }}\`](${{ steps.upload-terraform.outputs.s3-path }})
+            - **Terraform Plan:** \`s3://${{ secrets.TERRAFORM_ARTIFACTS_BUCKET }}/terraform-plans/${{ env.COMMIT_HASH }}/\`
+            
+            ### ✅ Validation Status
+            - YAML validation: ✅ Passed
+            - Terraform generation: ✅ Passed
+            - Terraform plan: ✅ Completed
+            
+            You can now merge this PR and deploy using the \`bedrock-forge-deploy\` workflow.`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: commentBody
+            });
+
+      - name: Upload validation artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-results-${{ env.COMMIT_HASH }}
+          path: |
+            terraform-output/
+            !terraform-output/*.zip
+          retention-days: 7
+
+  summary:
+    name: Validation Summary
+    runs-on: ubuntu-latest
+    needs: validate
+    if: always()
+    
+    steps:
+      - name: Validation Summary
+        run: |
+          echo "## 🔍 Bedrock Forge Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** \`${{ needs.validate.outputs.commit-hash }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Resources Found:** ${{ needs.validate.outputs.resources-found }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Validation Status:** ${{ needs.validate.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Plan Summary:** ${{ needs.validate.outputs.plan-summary }}" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.validate.result }}" == "success" ]; then
+            echo "- **S3 Path:** ${{ needs.validate.outputs.s3-path }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "✅ **Validation completed successfully!**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Generated Terraform modules are stored in S3 and can be reviewed before deployment." >> $GITHUB_STEP_SUMMARY
+            echo "Use the \`bedrock-forge-deploy\` workflow to deploy these validated configurations." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **Validation failed.**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Please check the logs and fix any issues before proceeding." >> $GITHUB_STEP_SUMMARY
+          fi

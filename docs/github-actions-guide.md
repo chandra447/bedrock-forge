@@ -1,11 +1,14 @@
 # GitHub Actions Integration Guide
 
-This guide shows how to use the Bedrock Forge reusable GitHub Actions workflow to deploy your AWS Bedrock agents and resources.
+This guide shows how to use the Bedrock Forge GitHub Actions workflows to validate and deploy your AWS Bedrock agents and resources with complete CI/CD automation.
 
 ## Table of Contents
 
 - [Overview](#overview)
+- [Workflow Architecture](#workflow-architecture)
 - [Quick Start](#quick-start)
+- [Validation Workflow](#validation-workflow)
+- [Deployment Workflow](#deployment-workflow)
 - [Configuration Reference](#configuration-reference)
 - [Authentication Setup](#authentication-setup)
 - [Advanced Usage](#advanced-usage)
@@ -13,32 +16,90 @@ This guide shows how to use the Bedrock Forge reusable GitHub Actions workflow t
 
 ## Overview
 
-The Bedrock Forge reusable GitHub Actions workflow lets you deploy AWS Bedrock agents directly from your repository, just like using any other GitHub Action. Simply reference the workflow and provide your AWS role - no complex setup required.
+Bedrock Forge provides two complementary GitHub Actions workflows that implement CI/CD best practices:
 
-Key features:
-- **Simple Integration**: Use like `actions/checkout` - just specify the action and required parameters
-- **Automated Deployment**: Deploy Bedrock agents on code changes
-- **Multi-Environment Support**: Separate deployments for dev, staging, and production
-- **Secure by Default**: Uses AWS IAM roles for authentication
-- **Terraform State Management**: S3 backend with DynamoDB locking
-- **OpenSearch Serverless**: Automated creation and configuration
-- **Flexible Configuration**: Customizable versions, regions, and deployment options
+### 🔍 **Validation Workflow** (`bedrock-forge-validate.yml`)
+- **Purpose**: Validate YAML configurations and generate Terraform plans
+- **Triggers**: Pull requests, manual dispatch
+- **Features**: YAML validation, Terraform generation, plan visibility, S3 storage
+- **Security**: No deployments, read-only validation
+
+### 🚀 **Deployment Workflow** (`bedrock-forge-deploy.yml`)
+- **Purpose**: Deploy pre-validated Terraform configurations
+- **Triggers**: Push to main, manual dispatch with approval
+- **Features**: S3 artifact retrieval, environment-specific deployment, state management
+- **Security**: Requires validated artifacts, environment protection
+
+## Workflow Architecture
+
+```mermaid
+graph TB
+    PR[Pull Request] --> V[Validation Workflow]
+    V --> S3[S3 Storage]
+    S3 --> |Generated Terraform| S3_MODULES["s3://bucket/generated-modules/commit-hash/"]
+    S3 --> |Terraform Plans| S3_PLANS["s3://bucket/terraform-plans/commit-hash/"]
+    
+    MAIN[Push to Main] --> D[Deployment Workflow]
+    D --> |Download| S3_MODULES
+    D --> |Deploy| ENV[Environment]
+    
+    V --> |PR Comment| PR_COMMENT[Plan Results]
+    D --> |Store State| S3_STATE["s3://bucket/terraform-states/env/"]
+```
+
+**Key Benefits:**
+- **Separation of Concerns**: Validation runs on PRs, deployment on main
+- **Transparency**: See exactly what Terraform will deploy before it happens
+- **Security**: No accidental deployments from validation
+- **Auditability**: Complete artifact and plan history in S3
+- **Reproducibility**: Deploy the exact same validated configuration
 
 ## Quick Start
 
 ### 1. Prerequisites
 
-Before using the Bedrock Forge workflow, ensure you have:
+Before using the Bedrock Forge workflows, ensure you have:
 
 - AWS account with appropriate permissions
 - GitHub repository with your Bedrock YAML configurations
-- AWS IAM role configured for GitHub Actions
-- Terraform state S3 bucket (optional but recommended)
+- AWS IAM roles configured for GitHub Actions (validation and deployment)
+- S3 bucket for Terraform artifacts and state storage
 - DynamoDB table for state locking (optional but recommended)
 
-### 2. Create Workflow File
+### 2. Required Secrets
 
-Create `.github/workflows/deploy-bedrock-agents.yml` in your repository. Just like using `actions/checkout`, you specify the action and its required parameters:
+Add these secrets to your GitHub repository:
+
+```
+AWS_VALIDATION_ROLE=arn:aws:iam::123456789012:role/github-actions-validation
+AWS_DEPLOYMENT_ROLE=arn:aws:iam::123456789012:role/github-actions-deployment
+TERRAFORM_ARTIFACTS_BUCKET=your-terraform-artifacts-bucket
+TERRAFORM_STATE_BUCKET=your-terraform-state-bucket
+```
+
+### 3. Create Validation Workflow
+
+Create `.github/workflows/validate-bedrock.yml` for PR validation:
+
+```yaml
+name: Validate Bedrock Configuration
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '**/*.yml'
+      - '**/*.yaml'
+
+jobs:
+  validate:
+    uses: your-org/bedrock-forge/.github/workflows/bedrock-forge-validate.yml@main
+    secrets: inherit
+```
+
+### 4. Create Deployment Workflow
+
+Create `.github/workflows/deploy-bedrock.yml` for production deployment:
 
 ```yaml
 name: Deploy Bedrock Agents
@@ -46,73 +107,200 @@ name: Deploy Bedrock Agents
 on:
   push:
     branches: [main]
+    paths:
+      - '**/*.yml'
+      - '**/*.yaml'
+
+jobs:
+  deploy-dev:
+    uses: your-org/bedrock-forge/.github/workflows/bedrock-forge-deploy.yml@main
+    with:
+      environment: dev
+      aws_role: ${{ secrets.AWS_DEPLOYMENT_ROLE }}
+      tf_state_bucket: ${{ secrets.TERRAFORM_STATE_BUCKET }}
+    secrets: inherit
+```
+
+### 5. Workflow in Action
+
+1. **Create PR**: Validation workflow runs automatically
+2. **Review Plan**: Check generated Terraform plan in PR comments
+3. **Merge PR**: Deployment workflow deploys to dev environment
+4. **Manual Deploy**: Deploy to staging/prod with approval
+
+## Validation Workflow
+
+The validation workflow (`bedrock-forge-validate.yml`) provides comprehensive validation and planning capabilities:
+
+### Features
+
+- **YAML Validation**: Ensures all configuration files are valid
+- **Resource Scanning**: Identifies all resources to be created
+- **Terraform Generation**: Creates Terraform modules from YAML
+- **Plan Execution**: Runs `terraform plan` to show what will be deployed
+- **S3 Storage**: Stores generated artifacts with commit hash for traceability
+- **PR Comments**: Adds detailed validation results to pull requests
+
+### Usage
+
+```yaml
+name: Validate Bedrock Configuration
+
+on:
   pull_request:
+    branches: [main]
+    paths: ['**/*.yml', '**/*.yaml']
+
+jobs:
+  validate:
+    uses: your-org/bedrock-forge/.github/workflows/bedrock-forge-validate.yml@main
+    with:
+      aws_region: us-east-1
+      source_path: ./configs
+    secrets: inherit
+```
+
+### S3 Storage Structure
+
+```
+s3://your-terraform-bucket/
+├── generated-modules/
+│   ├── abc123def456/          # Commit hash
+│   │   ├── main.tf
+│   │   ├── variables.tf
+│   │   └── outputs.tf
+├── terraform-plans/
+│   ├── abc123def456/
+│   │   ├── plan.txt
+│   │   └── plan-detailed.txt
+```
+
+## Deployment Workflow
+
+The deployment workflow (`bedrock-forge-deploy.yml`) handles secure, environment-specific deployments:
+
+### Features
+
+- **Pre-validation Check**: Ensures Terraform modules exist in S3
+- **Environment Protection**: Requires approval for production deployments
+- **State Management**: Uses S3 backend with DynamoDB locking
+- **Rollback Safety**: Downloads exact validated artifacts
+- **Multi-Environment**: Supports dev, staging, production
+
+### Usage
+
+```yaml
+name: Deploy Bedrock Agents
+
+on:
+  push:
     branches: [main]
   workflow_dispatch:
     inputs:
       environment:
         description: 'Environment to deploy'
         required: true
-        default: 'dev'
         type: choice
         options: [dev, staging, prod]
-      dry_run:
-        description: 'Run in dry-run mode (plan only)'
+      commit_hash:
+        description: 'Specific commit to deploy'
         required: false
-        default: false
-        type: boolean
 
 jobs:
-  deploy:
+  deploy-dev:
     uses: your-org/bedrock-forge/.github/workflows/bedrock-forge-deploy.yml@main
     with:
-      aws_role: 'arn:aws:iam::123456789012:role/BedrockForgeDeploymentRole'
-      aws_region: 'us-east-1'
-      environment: ${{ inputs.environment || 'dev' }}
-      dry_run: ${{ inputs.dry_run || false }}
-      tf_state_bucket: 'my-terraform-state-bucket'
-```
+      environment: dev
+      aws_role: ${{ secrets.AWS_DEPLOYMENT_ROLE }}
+      tf_state_bucket: ${{ secrets.TERRAFORM_STATE_BUCKET }}
+    secrets: inherit
 
-**Note:** Replace `your-org/bedrock-forge` with the actual repository where you publish this action.
+  deploy-staging:
+    if: github.event_name == 'workflow_dispatch'
+    uses: your-org/bedrock-forge/.github/workflows/bedrock-forge-deploy.yml@main
+    with:
+      environment: staging
+      aws_role: ${{ secrets.AWS_DEPLOYMENT_ROLE }}
+      tf_state_bucket: ${{ secrets.TERRAFORM_STATE_BUCKET }}
+      commit_hash: ${{ inputs.commit_hash }}
+    secrets: inherit
+    environment: staging  # Requires approval
+
+  deploy-prod:
+    if: github.event_name == 'workflow_dispatch'
+    uses: your-org/bedrock-forge/.github/workflows/bedrock-forge-deploy.yml@main
+    with:
+      environment: prod
+      aws_role: ${{ secrets.AWS_DEPLOYMENT_ROLE }}
+      tf_state_bucket: ${{ secrets.TERRAFORM_STATE_BUCKET }}
+      commit_hash: ${{ inputs.commit_hash }}
+    secrets: inherit
+    environment: production  # Requires approval
+```
 
 ## Configuration Reference
 
-### Required Inputs
+### Validation Workflow Inputs
 
-| Input | Description | Example |
-|-------|-------------|---------|
-| `aws_role` | AWS IAM Role ARN to assume | `arn:aws:iam::123456789012:role/BedrockForgeRole` |
+| Input | Description | Required | Default |
+|-------|-------------|----------|---------|
+| `target_branch` | Target branch for validation | No | `main` |
+| `aws_region` | AWS region for validation | No | `us-east-1` |
+| `source_path` | Path to YAML configurations | No | `.` |
 
-### Optional Inputs
+### Deployment Workflow Inputs
 
-| Input | Description | Default | Example |
-|-------|-------------|---------|---------|
-| `environment` | Deployment environment | `dev` | `prod` |
-| `aws_region` | AWS region | `us-east-1` | `us-west-2` |
-| `aws_session_name` | AWS session name | `bedrock-forge-deploy` | `my-deploy-session` |
-| `terraform_version` | Terraform version | `1.5.0` | `1.6.0` |
-| `go_version` | Go version | `1.21` | `1.22` |
-| `bedrock_forge_version` | Bedrock Forge version/ref | `main` | `v1.0.0` |
-| `source_path` | Path to YAML configs | `.` | `./configs` |
-| `tf_state_bucket` | S3 bucket for state | None | `my-tf-state` |
-| `tf_state_key_prefix` | State key prefix | `bedrock-forge` | `my-project` |
-| `tf_state_lock_table` | DynamoDB lock table | None | `terraform-locks` |
-| `dry_run` | Plan only mode | `false` | `true` |
+| Input | Description | Required | Default |
+|-------|-------------|----------|---------|
+| `commit_hash` | Specific commit to deploy | No | `github.sha` |
+| `environment` | Environment to deploy | Yes | `dev` |
+| `aws_region` | AWS region for deployment | No | `us-east-1` |
+| `aws_role` | AWS IAM role ARN | Yes | - |
+| `tf_state_bucket` | S3 bucket for Terraform state | Yes | - |
+| `tf_state_key_prefix` | Key prefix for state files | No | `bedrock-forge` |
+| `tf_state_lock_table` | DynamoDB table for locking | No | - |
+| `dry_run` | Plan only, no apply | No | `false` |
+| `force_regenerate` | Force regenerate Terraform | No | `false` |
 
-### Secrets (Alternative Authentication)
+### Required Secrets
 
-| Secret | Description | When Required |
-|--------|-------------|---------------|
-| `AWS_ACCESS_KEY_ID` | AWS Access Key ID | When not using IAM roles |
-| `AWS_SECRET_ACCESS_KEY` | AWS Secret Access Key | When not using IAM roles |
+| Secret | Description | Used By |
+|--------|-------------|---------|
+| `AWS_VALIDATION_ROLE` | IAM role for validation | Validation workflow |
+| `AWS_DEPLOYMENT_ROLE` | IAM role for deployment | Deployment workflow |
+| `TERRAFORM_ARTIFACTS_BUCKET` | S3 bucket for artifacts | Both workflows |
+| `TERRAFORM_STATE_BUCKET` | S3 bucket for state | Deployment workflow |
 
 ## Authentication Setup
 
-### AWS IAM Role Setup
+### AWS IAM Roles
 
-Configure an AWS IAM role with the required permissions and trust policy for GitHub Actions:
+Create two IAM roles for GitHub Actions:
 
-**Required IAM Permissions**:
+#### Validation Role (Read-Only)
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:*",
+        "lambda:GetFunction",
+        "lambda:ListFunctions",
+        "iam:GetRole",
+        "iam:ListRoles",
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:ListBucket"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+#### Deployment Role (Full Access)
 ```json
 {
   "Version": "2012-10-17",
@@ -122,25 +310,10 @@ Configure an AWS IAM role with the required permissions and trust policy for Git
       "Action": [
         "bedrock:*",
         "lambda:*",
-        "aoss:*",
-        "iam:CreateRole",
-        "iam:DeleteRole",
-        "iam:AttachRolePolicy",
-        "iam:DetachRolePolicy",
-        "iam:PutRolePolicy",
-        "iam:DeleteRolePolicy",
-        "iam:GetRole",
-        "iam:PassRole",
-        "s3:GetObject",
-        "s3:PutObject",
-        "s3:DeleteObject",
-        "s3:ListBucket",
-        "dynamodb:GetItem",
-        "dynamodb:PutItem",
-        "dynamodb:DeleteItem",
-        "logs:CreateLogGroup",
-        "logs:CreateLogStream",
-        "logs:PutLogEvents"
+        "iam:*",
+        "s3:*",
+        "opensearch:*",
+        "opensearchserverless:*"
       ],
       "Resource": "*"
     }
@@ -148,28 +321,28 @@ Configure an AWS IAM role with the required permissions and trust policy for Git
 }
 ```
 
-**Note**: For specific instructions on setting up GitHub OIDC with AWS, refer to the [official AWS documentation](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers_create_oidc_github.html).
+### Trust Relationship
 
-### Terraform Backend Setup (Optional)
+Both roles need this trust relationship:
 
-#### S3 Bucket for State
-```bash
-# Create S3 bucket
-aws s3 mb s3://my-terraform-state-bucket
-
-# Enable versioning
-aws s3api put-bucket-versioning \
-  --bucket my-terraform-state-bucket \
-  --versioning-configuration Status=Enabled
-```
-
-#### DynamoDB for State Locking
-```bash
-aws dynamodb create-table \
-  --table-name terraform-locks \
-  --attribute-definitions AttributeName=LockID,AttributeType=S \
-  --key-schema AttributeName=LockID,KeyType=HASH \
-  --billing-mode PAY_PER_REQUEST
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::YOUR_ACCOUNT_ID:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRole",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:sub": "repo:YOUR_ORG/YOUR_REPO:ref:refs/heads/main"
+        }
+      }
+    }
+  ]
+}
 ```
 
 ## Advanced Usage
@@ -177,200 +350,116 @@ aws dynamodb create-table \
 ### Multi-Environment Deployment
 
 ```yaml
-name: Multi-Environment Deploy
+name: Multi-Environment Deployment
 
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        options: [dev, staging, prod]
+        default: dev
 
 jobs:
   deploy-dev:
     uses: your-org/bedrock-forge/.github/workflows/bedrock-forge-deploy.yml@main
     with:
-      aws_role: 'arn:aws:iam::123456789012:role/BedrockForgeDevRole'
-      environment: 'dev'
-      tf_state_bucket: 'dev-terraform-state'
+      environment: dev
+    secrets: inherit
 
   deploy-staging:
+    if: github.event_name == 'workflow_dispatch' && inputs.environment == 'staging'
     needs: deploy-dev
-    if: github.ref == 'refs/heads/main'
     uses: your-org/bedrock-forge/.github/workflows/bedrock-forge-deploy.yml@main
     with:
-      aws_role: 'arn:aws:iam::123456789012:role/BedrockForgeStagingRole'
-      environment: 'staging'
-      tf_state_bucket: 'staging-terraform-state'
+      environment: staging
+    secrets: inherit
+    environment: staging
 
   deploy-prod:
+    if: github.event_name == 'workflow_dispatch' && inputs.environment == 'prod'
     needs: deploy-staging
-    if: github.ref == 'refs/heads/main'
-    environment: production  # Requires manual approval
     uses: your-org/bedrock-forge/.github/workflows/bedrock-forge-deploy.yml@main
     with:
-      aws_role: 'arn:aws:iam::123456789012:role/BedrockForgeProdRole'
-      environment: 'prod'
-      tf_state_bucket: 'prod-terraform-state'
+      environment: prod
+    secrets: inherit
+    environment: production
 ```
 
 ### Cross-Region Deployment
 
 ```yaml
-name: Cross-Region Deploy
-
-on:
-  workflow_dispatch:
-    inputs:
-      regions:
-        description: 'Regions to deploy (comma-separated)'
-        required: true
-        default: 'us-east-1,us-west-2'
-
 jobs:
-  matrix-deploy:
-    strategy:
-      matrix:
-        region: ${{ fromJson(format('["{0}"]', join(split(inputs.regions, ','), '","'))) }}
-    
+  deploy-us-east-1:
     uses: your-org/bedrock-forge/.github/workflows/bedrock-forge-deploy.yml@main
     with:
-      aws_role: 'arn:aws:iam::123456789012:role/BedrockForgeRole'
-      aws_region: ${{ matrix.region }}
-      environment: 'prod'
-      tf_state_bucket: 'terraform-state-${{ matrix.region }}'
-```
+      environment: prod
+      aws_region: us-east-1
+    secrets: inherit
 
-### Dry Run for Pull Requests
-
-```yaml
-name: PR Validation
-
-on:
-  pull_request:
-    branches: [main]
-
-jobs:
-  validate:
+  deploy-eu-west-1:
     uses: your-org/bedrock-forge/.github/workflows/bedrock-forge-deploy.yml@main
     with:
-      aws_role: 'arn:aws:iam::123456789012:role/BedrockForgeReadOnlyRole'
-      environment: 'dev'
-      dry_run: true  # Only plan, don't apply
-      tf_state_bucket: 'dev-terraform-state'
+      environment: prod
+      aws_region: eu-west-1
+    secrets: inherit
 ```
 
-### Example Repository Structure
+### Artifact Inspection
 
-```
-my-bedrock-project/
-├── .github/
-│   └── workflows/
-│       └── deploy-bedrock-agents.yml
-├── agents/
-│   ├── customer-support.yml
-│   └── sales-assistant.yml
-├── lambdas/
-│   ├── order-lookup/
-│   │   ├── lambda.yml
-│   │   ├── app.py
-│   │   └── requirements.txt
-│   └── product-search/
-│       ├── lambda.yml
-│       └── index.js
-├── knowledge-bases/
-│   └── company-docs.yml
-├── opensearch/
-│   └── vector-store.yml
-└── README.md
+View generated Terraform modules and plans:
+
+```bash
+# List all generated modules
+aws s3 ls s3://your-terraform-bucket/generated-modules/
+
+# Download specific commit modules
+aws s3 cp s3://your-terraform-bucket/generated-modules/abc123def456/ ./terraform-modules/ --recursive
+
+# View terraform plan
+aws s3 cp s3://your-terraform-bucket/terraform-plans/abc123def456/plan.txt ./plan.txt
+cat plan.txt
 ```
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Permission Denied**
-   - Ensure your AWS role has all required permissions
-   - Check if the role trust policy allows your GitHub repository
-   - Verify the role ARN is correct
+#### 1. No Validated Terraform Modules Found
+**Error**: "No validated Terraform modules available for commit abc123"
 
-2. **Terraform State Lock**
-   - Check if DynamoDB table exists and is accessible
-   - Ensure the table name matches your configuration
-   - Look for stuck locks in DynamoDB console
+**Solution**: Run validation workflow first or use `force_regenerate: true`
 
-3. **Build Failures**
-   - Verify Go version compatibility with your Lambda functions
-   - Check if your YAML files are valid
-   - Ensure all required dependencies are included
+#### 2. S3 Access Denied
+**Error**: "Access Denied" when accessing S3 bucket
 
-4. **Resource Conflicts**
-   - Use unique resource names across environments
-   - Check for naming conflicts in AWS console
-   - Verify region-specific resource availability
+**Solution**: Verify IAM role has S3 permissions and bucket policy allows access
 
-### Debugging Tips
+#### 3. Terraform Plan Fails
+**Error**: Terraform plan fails during validation
 
-1. **Enable Debug Logs**: Set repository variables:
-   - `ACTIONS_STEP_DEBUG: true`
-   - `ACTIONS_RUNNER_DEBUG: true`
+**Solution**: Check AWS permissions and resource dependencies
 
-2. **Check Workflow Outputs**: Review the job summaries for detailed information
+#### 4. Environment Not Found
+**Error**: Environment protection rules not applied
 
-3. **Validate Locally**: Test your configurations before committing:
-   ```bash
-   # Build Bedrock Forge locally
-   go build -o bedrock-forge ./cmd/bedrock-forge
-   
-   # Validate your configurations
-   ./bedrock-forge validate ./your-configs
-   
-   # Test generation
-   ./bedrock-forge generate ./your-configs ./output
-   ```
+**Solution**: Configure environment protection rules in GitHub repository settings
 
-4. **Test AWS Authentication**:
-   ```bash
-   aws sts get-caller-identity
-   aws bedrock list-agents
-   ```
+### Debug Mode
 
-### Getting Help
+Enable debug output by setting repository variables:
 
-- Check the [Bedrock Forge documentation](../README.md)
-- Review example configurations in the `examples/` directory
-- File issues on the [GitHub repository](https://github.com/your-org/bedrock-forge/issues)
+```
+ACTIONS_RUNNER_DEBUG=true
+ACTIONS_STEP_DEBUG=true
+```
 
-## Security Best Practices
+### Support
 
-1. **Use IAM roles instead of access keys** when possible
-2. **Limit role permissions** to only what's needed
-3. **Use separate roles per environment**
-4. **Enable CloudTrail** for audit logging
-5. **Store sensitive data in GitHub secrets**, not in YAML files
-6. **Use environment protection rules** for production deployments
-7. **Regularly review and rotate credentials**
-8. **Monitor deployment activities** and set up alerts
-
-## Best Practices
-
-### Repository Organization
-- Keep configurations in organized directories (`agents/`, `lambdas/`, etc.)
-- Use consistent naming conventions
-- Version control all configuration changes
-- Document environment-specific settings
-
-### Deployment Strategy
-- Use pull requests for code review
-- Implement automated testing in CI pipeline
-- Use environment promotion (dev → staging → prod)
-- Enable manual approval for production deployments
-- Monitor deployments with health checks
-
-### Cost Management
-- Use appropriate instance sizes per environment
-- Implement resource tagging for cost tracking
-- Set up budget alerts
-- Clean up unused resources regularly
-- Monitor usage patterns and optimize accordingly
-
----
-
-This guide provides everything you need to use the Bedrock Forge reusable GitHub Actions workflow to deploy your AWS Bedrock agents and resources efficiently and securely.
+For issues with the workflows:
+1. Check the workflow logs in GitHub Actions
+2. Verify S3 bucket permissions and contents
+3. Confirm IAM roles and trust relationships
+4. Test Terraform generation locally with `bedrock-forge generate`

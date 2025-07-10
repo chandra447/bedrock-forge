@@ -1,16 +1,20 @@
-name: Bedrock Forge Validate & Deploy
+name: Bedrock Forge Deploy
 
 on:
-  workflow_call:
+  push:
+    branches: [ main, master ]
+    paths:
+      - '**/*.yml'
+      - '**/*.yaml'
+  workflow_dispatch:
     inputs:
-      validation_only:
-        description: 'Run validation only (no deployment)'
+      commit_hash:
+        description: 'Commit hash to deploy (uses latest if not specified)'
         required: false
-        default: true
-        type: boolean
+        type: string
       environment:
         description: 'Environment to deploy (dev, staging, prod)'
-        required: false
+        required: true
         default: 'dev'
         type: string
       aws_region:
@@ -19,8 +23,8 @@ on:
         default: 'us-east-1'
         type: string
       aws_role:
-        description: 'AWS IAM Role ARN to assume for deployment (required if validation_only is false)'
-        required: false
+        description: 'AWS IAM Role ARN to assume for deployment'
+        required: true
         type: string
       aws_session_name:
         description: 'AWS session name for the assumed role'
@@ -32,24 +36,9 @@ on:
         required: false
         default: '1.5.0'
         type: string
-      go_version:
-        description: 'Go version to use for building Bedrock Forge'
-        required: false
-        default: '1.21'
-        type: string
-      bedrock_forge_version:
-        description: 'Bedrock Forge version/ref to use (e.g., v1.0.0, main, latest)'
-        required: false
-        default: 'latest'
-        type: string
-      source_path:
-        description: 'Path to YAML configurations in the repository'
-        required: false
-        default: '.'
-        type: string
       tf_state_bucket:
-        description: 'S3 bucket for Terraform state (required if validation_only is false)'
-        required: false
+        description: 'S3 bucket for Terraform state'
+        required: true
         type: string
       tf_state_key_prefix:
         description: 'Key prefix for Terraform state in S3'
@@ -65,95 +54,155 @@ on:
         required: false
         default: false
         type: boolean
+      force_regenerate:
+        description: 'Force regenerate Terraform instead of using S3 cached version'
+        required: false
+        default: false
+        type: boolean
+  workflow_call:
+    inputs:
+      commit_hash:
+        description: 'Commit hash to deploy (uses latest if not specified)'
+        required: false
+        type: string
+      environment:
+        description: 'Environment to deploy (dev, staging, prod)'
+        required: true
+        default: 'dev'
+        type: string
+      aws_region:
+        description: 'AWS Region for deployment'
+        required: false
+        default: 'us-east-1'
+        type: string
+      aws_role:
+        description: 'AWS IAM Role ARN to assume for deployment'
+        required: true
+        type: string
+      aws_session_name:
+        description: 'AWS session name for the assumed role'
+        required: false
+        default: 'bedrock-forge-deploy'
+        type: string
+      terraform_version:
+        description: 'Terraform version to use'
+        required: false
+        default: '1.5.0'
+        type: string
+      tf_state_bucket:
+        description: 'S3 bucket for Terraform state'
+        required: true
+        type: string
+      tf_state_key_prefix:
+        description: 'Key prefix for Terraform state in S3'
+        required: false
+        default: 'bedrock-forge'
+        type: string
+      tf_state_lock_table:
+        description: 'DynamoDB table for Terraform state locking'
+        required: false
+        type: string
+      dry_run:
+        description: 'Run in dry-run mode (plan only, no apply)'
+        required: false
+        default: false
+        type: boolean
+      force_regenerate:
+        description: 'Force regenerate Terraform instead of using S3 cached version'
+        required: false
+        default: false
+        type: boolean
     secrets:
-      AWS_ACCESS_KEY_ID:
-        description: 'AWS Access Key ID (if not using OIDC)'
+      AWS_DEPLOYMENT_ROLE:
+        description: 'AWS IAM Role ARN for deployment'
         required: false
-      AWS_SECRET_ACCESS_KEY:
-        description: 'AWS Secret Access Key (if not using OIDC)'
-        required: false
+      TERRAFORM_ARTIFACTS_BUCKET:
+        description: 'S3 bucket for Terraform artifacts'
+        required: true
+      TERRAFORM_STATE_BUCKET:
+        description: 'S3 bucket for Terraform state'
+        required: true
 
 env:
-  AWS_REGION: ${{ inputs.aws_region }}
-  TF_VERSION: ${{ inputs.terraform_version }}
-  GO_VERSION: ${{ inputs.go_version }}
+  AWS_REGION: ${{ inputs.aws_region || 'us-east-1' }}
+  TF_VERSION: ${{ inputs.terraform_version || '1.5.0' }}
+  GO_VERSION: '1.21'
+  COMMIT_HASH: ${{ inputs.commit_hash || github.sha }}
 
 jobs:
-  validate:
-    name: Validate Configuration
+  prepare:
+    name: Prepare Deployment
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     outputs:
-      resources-found: ${{ steps.scan.outputs.resources-found }}
-      lambdas-found: ${{ steps.scan.outputs.lambdas-found }}
-      schemas-found: ${{ steps.scan.outputs.schemas-found }}
+      commit-hash: ${{ env.COMMIT_HASH }}
+      terraform-source: ${{ steps.check-terraform.outputs.terraform-source }}
+      s3-path: ${{ steps.check-terraform.outputs.s3-path }}
     
     steps:
-      - name: Checkout user repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Checkout Bedrock Forge
-        uses: actions/checkout@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          repository: 'your-org/bedrock-forge'  
-          ref: ${{ inputs.bedrock_forge_version }}
-          path: .bedrock-forge
+          role-to-assume: ${{ inputs.aws_role || secrets.AWS_DEPLOYMENT_ROLE }}
+          role-session-name: ${{ inputs.aws_session_name }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Setup Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Build Bedrock Forge
-        working-directory: .bedrock-forge
+      - name: Check for pre-validated Terraform modules
+        id: check-terraform
         run: |
-          go build -o ../bedrock-forge ./cmd/bedrock-forge
-
-      - name: Validate YAML configurations
-        run: |
-          ./bedrock-forge validate ${{ inputs.source_path }}
-          echo "✅ All YAML configurations are valid"
-
-      - name: Scan for resources
-        id: scan
-        run: |
-          output=$(./bedrock-forge scan ${{ inputs.source_path }})
-          echo "scan-output<<EOF" >> $GITHUB_OUTPUT
-          echo "$output" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          BUCKET_NAME="${{ secrets.TERRAFORM_ARTIFACTS_BUCKET }}"
+          S3_PATH="generated-modules/${{ env.COMMIT_HASH }}"
           
-          # Count resources for pipeline optimization
-          resources=$(echo "$output" | grep -c "Total Resources Found:" || echo "0")
-          lambdas=$(echo "$output" | grep -c "📦 Lambda" || echo "0")
-          schemas=$(echo "$output" | grep -c "📦 ActionGroup" || echo "0")
-          opensearch=$(echo "$output" | grep -c "📦 OpenSearchServerless" || echo "0")
-          
-          echo "resources-found=$resources" >> $GITHUB_OUTPUT
-          echo "lambdas-found=$lambdas" >> $GITHUB_OUTPUT
-          echo "schemas-found=$schemas" >> $GITHUB_OUTPUT
-          echo "opensearch-found=$opensearch" >> $GITHUB_OUTPUT
+          # Check if pre-validated Terraform modules exist in S3
+          if aws s3 ls s3://${BUCKET_NAME}/${S3_PATH}/ >/dev/null 2>&1; then
+            echo "✅ Found pre-validated Terraform modules in S3"
+            echo "terraform-source=s3" >> $GITHUB_OUTPUT
+            echo "s3-path=s3://${BUCKET_NAME}/${S3_PATH}" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️ No pre-validated Terraform modules found in S3"
+            if [ "${{ inputs.force_regenerate }}" == "true" ]; then
+              echo "🔄 Force regeneration requested"
+              echo "terraform-source=regenerate" >> $GITHUB_OUTPUT
+            else
+              echo "❌ No validated Terraform modules available for commit ${{ env.COMMIT_HASH }}"
+              echo "Please run the validation workflow first or use force_regenerate=true"
+              exit 1
+            fi
+          fi
 
-      - name: Display scan results
+      - name: Display preparation summary
         run: |
-          echo "## Resource Scan Results" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "${{ steps.scan.outputs.scan-output }}" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 Deployment Preparation" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit Hash:** \`${{ env.COMMIT_HASH }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Terraform Source:** ${{ steps.check-terraform.outputs.terraform-source }}" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.check-terraform.outputs.terraform-source }}" == "s3" ]; then
+            echo "- **S3 Path:** ${{ steps.check-terraform.outputs.s3-path }}" >> $GITHUB_STEP_SUMMARY
+          fi
 
-  package:
-    name: Package Artifacts
+  generate:
+    name: Generate Terraform (if needed)
     runs-on: ubuntu-latest
-    needs: validate
-    if: inputs.validation_only != true && (needs.validate.outputs.lambdas-found > 0 || needs.validate.outputs.schemas-found > 0)
+    needs: prepare
+    if: needs.prepare.outputs.terraform-source == 'regenerate'
+    permissions:
+      contents: read
+      id-token: write
     
     steps:
-      - name: Checkout user repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Checkout Bedrock Forge
         uses: actions/checkout@v4
         with:
-          repository: 'your-org/bedrock-forge'  # Update with actual repository
-          ref: ${{ inputs.bedrock_forge_version }}
+          repository: 'your-org/bedrock-forge'
+          ref: 'main'
           path: .bedrock-forge
 
       - name: Setup Go
@@ -169,109 +218,66 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ inputs.aws_role }}
+          role-to-assume: ${{ inputs.aws_role || secrets.AWS_DEPLOYMENT_ROLE }}
           role-session-name: ${{ inputs.aws_session_name }}
-          aws-region: ${{ inputs.aws_region }}
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Package Lambda functions and schemas
+      - name: Generate Terraform configuration
         run: |
-          echo "📦 Packaging Lambda functions and OpenAPI schemas..."
-          ./bedrock-forge generate ${{ inputs.source_path }} ./terraform-output
-          echo "✅ Packaging completed"
-          
-          # List generated files for debugging
-          echo "## Generated Files" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          find terraform-output -type f -name "*.tf" -o -name "*.json" -o -name "*.zip" | head -20 >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "🔧 Generating Terraform configuration..."
+          ./bedrock-forge generate . ./terraform-output
+          echo "✅ Terraform configuration generated"
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: terraform-config-${{ inputs.environment }}
-          path: terraform-output/
-          retention-days: 30
+      - name: Upload Terraform modules to S3
+        run: |
+          BUCKET_NAME="${{ secrets.TERRAFORM_ARTIFACTS_BUCKET }}"
+          S3_PATH="generated-modules/${{ env.COMMIT_HASH }}"
+          
+          # Upload generated Terraform modules
+          aws s3 cp terraform-output/ s3://${BUCKET_NAME}/${S3_PATH}/ --recursive
+          echo "✅ Terraform modules uploaded to S3: s3://${BUCKET_NAME}/${S3_PATH}"
 
   deploy:
     name: Deploy Infrastructure
     runs-on: ubuntu-latest
-    needs: [validate, package]
-    if: inputs.validation_only != true && always() && needs.validate.result == 'success'
+    needs: [prepare, generate]
+    if: always() && needs.prepare.result == 'success' && (needs.generate.result == 'success' || needs.generate.result == 'skipped')
     environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
     
     steps:
-      - name: Validate deployment parameters
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ inputs.aws_role || secrets.AWS_DEPLOYMENT_ROLE }}
+          role-session-name: ${{ inputs.aws_session_name }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Download Terraform modules from S3
         run: |
-          if [ -z "${{ inputs.aws_role }}" ]; then
-            echo "❌ aws_role is required for deployment"
-            exit 1
-          fi
-          if [ -z "${{ inputs.tf_state_bucket }}" ]; then
-            echo "❌ tf_state_bucket is required for deployment"
-            exit 1
-          fi
-          echo "✅ All required deployment parameters provided"
-
-      - name: Checkout user repository
-        uses: actions/checkout@v4
-
-      - name: Download artifacts
-        if: needs.package.result == 'success'
-        uses: actions/download-artifact@v4
-        with:
-          name: terraform-config-${{ inputs.environment }}
-          path: terraform-output/
-
-      - name: Checkout Bedrock Forge
-        uses: actions/checkout@v4
-        with:
-          repository: 'your-org/bedrock-forge'  # Update with actual repository
-          ref: ${{ inputs.bedrock_forge_version }}
-          path: .bedrock-forge
-
-      - name: Setup Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
+          BUCKET_NAME="${{ secrets.TERRAFORM_ARTIFACTS_BUCKET }}"
+          S3_PATH="generated-modules/${{ env.COMMIT_HASH }}"
+          
+          # Download pre-validated Terraform modules
+          aws s3 cp s3://${BUCKET_NAME}/${S3_PATH}/ ./terraform-output/ --recursive
+          echo "✅ Terraform modules downloaded from S3"
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Build Bedrock Forge
-        working-directory: .bedrock-forge
-        run: |
-          go build -o ../bedrock-forge ./cmd/bedrock-forge
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ inputs.aws_role }}
-          role-session-name: ${{ inputs.aws_session_name }}
-          aws-region: ${{ inputs.aws_region }}
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-
-      - name: Generate Terraform configuration
-        if: needs.package.result != 'success'
-        run: |
-          echo "🔧 Generating Terraform configuration..."
-          ./bedrock-forge generate ${{ inputs.source_path }} ./terraform-output
-          echo "✅ Terraform configuration generated"
-
       - name: Configure Terraform backend
-        if: inputs.tf_state_bucket != ''
         working-directory: terraform-output
         run: |
           cat > backend.tf << EOF
           terraform {
             backend "s3" {
-              bucket         = "${{ inputs.tf_state_bucket }}"
+              bucket         = "${{ inputs.tf_state_bucket || secrets.TERRAFORM_STATE_BUCKET }}"
               key            = "${{ inputs.tf_state_key_prefix }}/${{ inputs.environment }}/terraform.tfstate"
-              region         = "${{ inputs.aws_region }}"
+              region         = "${{ env.AWS_REGION }}"
               $(if [ -n "${{ inputs.tf_state_lock_table }}" ]; then echo "dynamodb_table = \"${{ inputs.tf_state_lock_table }}\""; fi)
               encrypt        = true
             }
@@ -294,16 +300,18 @@ jobs:
           # Save plan output for summary
           terraform show -no-color tfplan > tfplan.txt
 
-      - name: Upload Terraform plan
-        uses: actions/upload-artifact@v4
-        with:
-          name: terraform-plan-${{ inputs.environment }}
-          path: terraform-output/tfplan.txt
-          retention-days: 30
+      - name: Upload Terraform plan to S3
+        run: |
+          BUCKET_NAME="${{ secrets.TERRAFORM_ARTIFACTS_BUCKET }}"
+          S3_PATH="terraform-plans/${{ env.COMMIT_HASH }}"
+          
+          # Upload plan files
+          aws s3 cp terraform-output/tfplan.txt s3://${BUCKET_NAME}/${S3_PATH}/plan-${{ inputs.environment }}.txt
+          echo "✅ Terraform plan uploaded to S3: s3://${BUCKET_NAME}/${S3_PATH}"
 
       - name: Apply Terraform changes
         working-directory: terraform-output
-        if: inputs.dry_run != true && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch')
+        if: inputs.dry_run != true
         run: |
           terraform apply tfplan
 
@@ -318,13 +326,13 @@ jobs:
             echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
           fi
           
-          echo "- **Environment**: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Region**: ${{ inputs.aws_region }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **AWS Role**: ${{ inputs.aws_role }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit Hash:** \`${{ env.COMMIT_HASH }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Region:** ${{ env.AWS_REGION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **AWS Role:** ${{ inputs.aws_role || secrets.AWS_DEPLOYMENT_ROLE }}" >> $GITHUB_STEP_SUMMARY
           
-          if [ -n "${{ inputs.tf_state_bucket }}" ]; then
-            echo "- **Terraform State**: ${{ inputs.tf_state_bucket }}/${{ inputs.tf_state_key_prefix }}/${{ inputs.environment }}/terraform.tfstate" >> $GITHUB_STEP_SUMMARY
-          fi
+          STATE_BUCKET="${{ inputs.tf_state_bucket || secrets.TERRAFORM_STATE_BUCKET }}"
+          echo "- **Terraform State:** s3://${STATE_BUCKET}/${{ inputs.tf_state_key_prefix }}/${{ inputs.environment }}/terraform.tfstate" >> $GITHUB_STEP_SUMMARY
           
           # Get Terraform outputs if not dry run
           if [ "${{ inputs.dry_run }}" != "true" ] && [ -f "terraform.tfstate" ]; then
@@ -346,45 +354,32 @@ jobs:
           fi
 
   cleanup:
-    name: Summary
+    name: Deployment Summary
     runs-on: ubuntu-latest
-    needs: [validate, package, deploy]
+    needs: [prepare, generate, deploy]
     if: always()
     
     steps:
       - name: Summary
         run: |
-          echo "## Bedrock Forge Summary" >> $GITHUB_STEP_SUMMARY
-          echo "- **Mode**: ${{ inputs.validation_only == true && 'Validation Only' || 'Validation & Deployment' }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Validation**: ${{ needs.validate.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 Bedrock Forge Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit Hash:** \`${{ needs.prepare.outputs.commit-hash }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Terraform Source:** ${{ needs.prepare.outputs.terraform-source }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Preparation:** ${{ needs.prepare.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Generation:** ${{ needs.generate.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deployment:** ${{ needs.deploy.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Dry Run:** ${{ inputs.dry_run }}" >> $GITHUB_STEP_SUMMARY
           
-          if [ "${{ inputs.validation_only }}" == "true" ]; then
-            echo "- **Packaging**: Skipped (validation only)" >> $GITHUB_STEP_SUMMARY
-            echo "- **Deployment**: Skipped (validation only)" >> $GITHUB_STEP_SUMMARY
-            echo "- **Environment**: N/A (validation only)" >> $GITHUB_STEP_SUMMARY
-            
-            if [ "${{ needs.validate.result }}" == "success" ]; then
-              echo "✅ Validation completed successfully! Your YAML configurations are valid."
+          if [ "${{ needs.deploy.result }}" == "success" ]; then
+            if [ "${{ inputs.dry_run }}" == "true" ]; then
+              echo "✅ **Dry run completed successfully** - review the plan above"
             else
-              echo "❌ Validation failed. Check the logs for details."
-              exit 1
+              echo "✅ **Deployment completed successfully!**"
             fi
+          elif [ "${{ needs.deploy.result }}" == "failure" ]; then
+            echo "❌ **Deployment failed.** Check the logs for details."
+            exit 1
           else
-            echo "- **Packaging**: ${{ needs.package.result }}" >> $GITHUB_STEP_SUMMARY
-            echo "- **Deployment**: ${{ needs.deploy.result }}" >> $GITHUB_STEP_SUMMARY
-            echo "- **Environment**: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
-            echo "- **Dry Run**: ${{ inputs.dry_run }}" >> $GITHUB_STEP_SUMMARY
-            
-            if [ "${{ needs.deploy.result }}" == "success" ]; then
-              if [ "${{ inputs.dry_run }}" == "true" ]; then
-                echo "✅ Dry run completed successfully - review the plan above"
-              else
-                echo "✅ Deployment completed successfully!"
-              fi
-            elif [ "${{ needs.deploy.result }}" == "failure" ]; then
-              echo "❌ Deployment failed. Check the logs for details."
-              exit 1
-            else
-              echo "⚠️ Deployment was skipped or cancelled."
-            fi
+            echo "⚠️ **Deployment was skipped or cancelled.**"
           fi
