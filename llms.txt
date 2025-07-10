@@ -1,1694 +1,801 @@
 # Bedrock Forge
 
-Bedrock Forge is an enterprise platform that transforms YAML configurations into AWS Bedrock agent deployments using Terraform modules. It eliminates repetitive Terraform code by providing a YAML-driven configuration approach for AWS Bedrock services.
+Bedrock Forge is an enterprise platform that transforms YAML configurations into AWS Bedrock agent deployments using Terraform modules. It provides a declarative, YAML-driven approach for deploying AWS Bedrock services with automatic IAM management, dependency resolution, and integrated CI/CD workflows.
 
-## Features
+## Core Features
 
-**Core Capabilities:**
-- **YAML to Terraform Conversion**: Transform declarative YAML configurations into production-ready Terraform modules
-- **Multi-Resource Support**: Agents, Lambda functions, Action Groups, Knowledge Bases, Guardrails, Prompts, IAM roles, and Custom Modules
-- **Custom Module Integration**: Include your own Terraform modules alongside Bedrock resources
-- **Automatic IAM Role Generation**: Generate comprehensive IAM roles with foundation model, Lambda, and knowledge base permissions
-- **Dependency Management**: Automatic resolution and ordering of resource dependencies
-- **Artifact Packaging**: Automated Lambda code packaging and OpenAPI schema management
-- **Enterprise Governance**: Enforce naming conventions, tagging policies, and security standards
-- **CI/CD Integration**: GitHub Actions workflows for automated deployment pipelines
+**Infrastructure as Code:**
+- YAML to Terraform conversion with automatic module generation
+- Comprehensive dependency management and resource ordering
+- Automatic IAM role generation with appropriate permissions
+- Cross-resource references and validation
 
-## Technology Stack
-- **Go CLI Tool** (cobra-based) for YAML processing and Terraform generation
-- **HashiCorp HCL/Terraform** for infrastructure-as-code generation
-- **AWS Bedrock** for agent, guardrail, knowledge base, and prompt management
-- **GitHub Actions** for CI/CD automation
-- **S3** for artifact storage (Lambda code, OpenAPI schemas)
+**CI/CD Integration:**
+- Separate validation and deployment GitHub Actions workflows
+- S3-based artifact storage with commit hash organization
+- Terraform plan visibility in pull request comments
+- Environment-specific deployments with approval workflows
+
+**Enterprise Capabilities:**
+- Support for user's own Terraform files via CustomResources
+- Automated Lambda code packaging and deployment
+- OpenAPI schema management for Action Groups
+- Enterprise governance and tagging enforcement
 
 ## Supported Resources
 
-**AWS Bedrock Resources:**
-- **Agent**: Bedrock conversational agents with foundation models, instructions, inline action groups, and deployment aliases
-- **Lambda**: AWS Lambda functions for action groups with runtime and environment settings
-- **ActionGroup**: Agent action capabilities with API schemas and executors (requires agent association)
-- **KnowledgeBase**: Vector knowledge bases with embeddings and data sources
-- **OpenSearchServerless**: Auto-created OpenSearch Serverless collections with security policies for knowledge bases
-- **Guardrail**: Content safety and compliance with filters and policies
-- **Prompt**: Custom prompt templates with TEXT/CHAT types, input variables, tool calling, and encryption support
-- **IAMRole**: IAM execution roles with policies and permissions
+### 1. Agent - AWS Bedrock Conversational Agents
 
-**Infrastructure Integration:**
-- **CustomModule**: Include any Terraform module (local, registry, or git) alongside Bedrock resources
-- **AgentKnowledgeBaseAssociation**: Link agents to knowledge bases for retrieval capabilities
-
-## YAML Configuration Examples
-
-### Agent Configuration
 ```yaml
 kind: Agent
 metadata:
-  name: "customer-support"
-  description: "Customer support agent"
+  name: string (required)
+  description: string (optional)
 spec:
-  foundationModel: "anthropic.claude-3-sonnet-20240229-v1:0"
-  instruction: "You are a helpful customer support agent..."
-  idleSessionTtlInSeconds: 3600
-  guardrail:
-    name: "content-safety-guardrail"
-    version: "1"
-    mode: "pre"
-  # Inline action groups (new structure)
-  actionGroups:
-    - name: "order-lookup"
-      description: "Look up customer orders"
-      actionGroupExecutor:
-        lambda: "order-lookup-lambda"
-      functionSchema:
+  foundationModel: string (required) # e.g., "anthropic.claude-3-sonnet-20240229-v1:0"
+  instruction: string (required)
+  description: string (optional)
+  idleSessionTtl: int (optional)
+  customerEncryptionKey: string (optional)
+  tags: map[string]string (optional)
+  
+  # Guardrail configuration
+  guardrail: (optional)
+    name: string (required) # Reference to Guardrail resource
+    version: string (optional)
+    mode: string (optional)
+  
+  # Inline action groups (preferred approach)
+  actionGroups: (optional)
+    - name: string (required)
+      description: string (optional)
+      parentActionGroupSignature: string (optional)
+      actionGroupState: string (optional)
+      skipResourceInUseCheck: bool (optional)
+      actionGroupExecutor: (optional)
+        lambda: string (optional) # Reference to Lambda resource
+        lambdaArn: string (optional) # Direct Lambda ARN
+        customControl: string (optional)
+      apiSchema: (optional)
+        s3:
+          s3BucketName: string (required)
+          s3ObjectKey: string (required)
+        payload: string (optional)
+      functionSchema: (optional)
         functions:
-          - name: "lookup_order"
+          - name: string (required)
+            description: string (optional)
             parameters:
-              order_id:
-                type: "string"
-                required: true
-  # IAM role is automatically generated!
-  promptOverrides:
-    - promptType: "ORCHESTRATION"
-      prompt: "custom-orchestration-prompt"
-      variant: "production"
-  memoryConfiguration:
-    enabledMemoryTypes: ["SESSION_SUMMARY"]
-    storageDays: 30
+              paramName:
+                description: string (optional)
+                required: bool (optional)
+                type: string (optional)
   
-  # Agent aliases for deployment strategies
-  aliases:
-    - name: "dev"
-      description: "Development version for testing"
-      tags:
-        Environment: "dev"
-        Purpose: "development"
-    
-    - name: "prod"
-      description: "Production version"
-      tags:
-        Environment: "prod"
-        Purpose: "production"
-        CriticalService: "true"
+  # Prompt overrides
+  promptOverrides: (optional)
+    - promptType: string (required)
+      promptArn: string (optional)
+      prompt: string (optional) # Reference to Prompt resource
+      promptVariant: string (optional)
+      variant: string (optional)
+  
+  # Memory configuration
+  memoryConfiguration: (optional)
+    enabledMemoryTypes: []string (optional)
+    storageDays: int (optional)
+  
+  # Agent aliases for environment management
+  aliases: (optional)
+    - name: string (required)
+      description: string (optional)
+      tags: map[string]string (optional)
 ```
 
-### Agent Aliases
+**Key Features:**
+- Automatic IAM execution role generation with comprehensive Bedrock permissions
+- Inline action groups with Lambda integration (no separate ActionGroup resources needed)
+- Guardrail and prompt integration via references
+- Agent aliases for environment-specific deployments
+- Cross-resource dependency management
 
-Agent aliases enable deployment strategies like staging, production, and environment separation by creating named references to agent deployments.
+### 2. Lambda - AWS Lambda Functions for Action Groups
 
-#### Basic Alias Configuration
-```yaml
-aliases:
-  - name: "dev"
-    description: "Development version for testing"
-    tags:
-      Environment: "dev"
-      Purpose: "development"
-  
-  - name: "prod"
-    description: "Production version"
-    tags:
-      Environment: "prod"
-      Purpose: "production"
-```
-
-#### Multiple Environment Aliases
-```yaml
-aliases:
-  - name: "dev"
-    description: "Development environment"
-    tags:
-      Environment: "dev"
-      Purpose: "development"
-      AutoUpdate: "true"
-  
-  - name: "staging"
-    description: "Staging environment for testing"
-    tags:
-      Environment: "staging"
-      Purpose: "pre-production"
-      ApprovalRequired: "true"
-  
-  - name: "prod"
-    description: "Production environment"
-    tags:
-      Environment: "prod"
-      Purpose: "production"
-      CriticalService: "true"
-```
-
-#### Deployment Benefits
-- **Environment Separation**: Dev, staging, and production aliases
-- **Named References**: Stable references to agents across environments
-- **Environment-Specific Tagging**: Tag aliases for different deployment contexts
-- **Simplified Management**: Organize agent deployments by purpose and environment
-- **CI/CD Integration**: Use aliases in deployment pipelines for different stages
-
-### Lambda Configuration
-
-**Basic Lambda Function:**
 ```yaml
 kind: Lambda
 metadata:
-  name: "order-lookup"
-  description: "Lambda function to look up orders"
+  name: string (required)
+  description: string (optional)
 spec:
-  runtime: "python3.9"
-  handler: "app.handler"
-  code:
-    source: "directory"  # Code co-located with YAML
-  environment:
-    ORDER_API_URL: "https://api.company.com/orders"
-    LOG_LEVEL: "INFO"
-  timeout: 30
-  memorySize: 256
+  runtime: string (required) # e.g., "python3.9", "nodejs18.x"
+  handler: string (required) # e.g., "app.handler"
+  code: (required)
+    source: string (required) # "directory", "zip", "s3"
+    zipFile: string (optional) # For inline code
+    s3Bucket: string (optional) # For S3-based code
+    s3Key: string (optional)
+    s3ObjectVersion: string (optional)
+  environment: map[string]string (optional)
+  timeout: int (optional) # Default: 3 seconds
+  memorySize: int (optional) # Default: 128 MB
+  reservedConcurrency: int (optional)
+  tags: map[string]string (optional)
+  vpcConfig: (optional)
+    securityGroupIds: []string (required)
+    subnetIds: []string (required)
+  
+  # Resource policy (optional - auto-generated based on agent references)
+  resourcePolicy: (optional)
+    allowBedrockAgents: bool (optional)
+    statements:
+      - sid: string (required)
+        effect: string (required)
+        principal: map[string]interface{} (required)
+        action: string|[]string (required)
+        resource: string (optional)
+        condition: map[string]interface{} (optional)
 ```
 
-**Zero-Configuration Lambda Functions:**
-```yaml
-kind: Lambda
-metadata:
-  name: "order-lookup"
-  description: "Lambda function to look up customer orders"
-spec:
-  runtime: "python3.9"
-  handler: "app.handler"
-  code:
-    source: "directory"
-  environment:
-    ORDER_API_URL: "https://api.company.com/orders"
-  timeout: 30
-  memorySize: 256
-# No resource policy needed - bedrock-forge handles permissions automatically!
-```
+**Key Features:**
+- Automatic IAM execution role generation
+- Code packaging and S3 deployment
+- Zero-configuration resource policies (auto-detects agent references)
+- Agent-specific permissions with source ARN restrictions
+- VPC integration support
 
-**Automatic Permission Management:**
-- **Zero Configuration Required**: No manual policy setup needed for Lambda functions
-- **Intelligent Detection**: Lambda generator automatically scans all agents to detect which ones reference each Lambda function
-- **Agent-Specific Permissions**: When agents reference a Lambda, automatic creation of agent-specific permissions with `aws:SourceArn` restrictions
-- **Future-Proof Permissions**: Lambda functions not yet referenced by agents get general Bedrock permissions for future use
-- **Maximum Security**: Each agent can only invoke Lambda functions it specifically references in action groups
-- **Enterprise Flexibility**: Optional custom `resourcePolicy` configuration for advanced scenarios
+### 3. ActionGroup - Standalone Action Groups (Alternative to Inline)
 
-**Permission Logic:**
-- **With Agent References**: Creates agent-specific permissions using `${module.agent_name.agent_arn}` as source ARN condition
-- **Without Agent References**: Creates general `bedrock.amazonaws.com` permission ready for future agent integration
-- **Custom Policies**: Advanced users can add additional policy statements for cross-account access or enterprise requirements
-
-### ActionGroup Configuration
-
-**Using Local Lambda Resource:**
 ```yaml
 kind: ActionGroup
 metadata:
-  name: "order-management"
-  description: "Action group for order operations"
+  name: string (required)
+  description: string (optional)
 spec:
-  # Required: Agent ID (module reference or direct ARN)
-  agentId: "${module.customer_support.agent_id}"  # References local agent module
-  agentVersion: "DRAFT"                            # Optional: Agent version (defaults to DRAFT)
-  description: "Provides order lookup capabilities"
-  # Required: Action group executor
-  actionGroupExecutor:
-    lambda: "order-lookup"  # References Lambda resource defined in same project
-  apiSchema:
+  agentId: string (required) # Reference to agent via module output
+  agentVersion: string (optional) # Default: "DRAFT"
+  description: string (optional)
+  parentActionGroupSignature: string (optional)
+  actionGroupState: string (optional)
+  skipResourceInUseCheck: bool (optional)
+  tags: map[string]string (optional)
+  
+  # Required executor configuration
+  actionGroupExecutor: (required)
+    lambda: string (optional) # Reference to Lambda resource
+    lambdaArn: string (optional) # Direct Lambda ARN
+    customControl: string (optional)
+  
+  # API or Function schema (mutually exclusive)
+  apiSchema: (optional)
     s3:
-      s3BucketName: "bedrock-schemas"
-      s3ObjectKey: "action-groups/order-management/openapi.json"
-  # Function schema for simple cases
-  functionSchema:
+      s3BucketName: string (required)
+      s3ObjectKey: string (required)
+    payload: string (optional)
+  
+  functionSchema: (optional)
     functions:
-      - name: "lookup_order"
-        description: "Look up order details by order ID"
+      - name: string (required)
+        description: string (optional)
         parameters:
-          order_id:
-            type: "string"
-            description: "The unique order identifier"
-            required: true
+          paramName:
+            description: string (optional)
+            required: bool (optional)
+            type: string (optional)
 ```
 
-**Using Existing Lambda ARN (Shared Lambda):**
-```yaml
-kind: ActionGroup
-metadata:
-  name: "shared-inventory-management"
-  description: "Action group using shared Lambda function"
-spec:
-  # Required: Agent ID (direct ARN for existing agent)
-  agentId: "arn:aws:bedrock:us-east-1:123456789012:agent/ABCD1234"  # Existing agent ARN
-  agentVersion: "1"  # Use specific version for production
-  description: "Provides inventory management using shared team Lambda function"
-  # Required: Action group executor
-  actionGroupExecutor:
-    lambdaArn: "arn:aws:lambda:us-east-1:123456789012:function:inventory-team-prod-inventory-service"
-  apiSchema:
-    s3:
-      s3BucketName: "bedrock-schemas"
-      s3ObjectKey: "action-groups/shared-inventory-management/openapi.json"
-  tags:
-    Environment: "prod"
-    Project: "inventory-management"
-    Owner: "inventory-team@company.com"
-```
+**Note:** Inline action groups in Agent resources are the preferred approach. Use standalone ActionGroups only when you need to deploy action groups separately from agents.
 
-**Important**: When using `lambdaArn`, ensure the Bedrock agent's IAM role has `lambda:InvokeFunction` permission for the specified Lambda function.
-
-### KnowledgeBase Configuration
-
-**Enhanced with OpenSearch Serverless Auto-Creation (Recommended):**
-
-```yaml
-# 1. Auto-create OpenSearch Serverless collection with all required policies
-kind: OpenSearchServerless
-metadata:
-  name: "customer-kb-collection"
-spec:
-  collectionName: "customer-knowledge-base"
-  type: "VECTORSEARCH"
-  accessPolicy:
-    autoConfigureForBedrock: true  # Automatically adds Bedrock permissions
-  vectorIndex:
-    name: "customer-kb-index"
-    fieldMapping:
-      vectorField: "vector"
-      textField: "text"
-      metadataField: "metadata"
-
----
-# 2. Reference the auto-created collection
-kind: KnowledgeBase
-metadata:
-  name: "faq-kb"
-  description: "Customer FAQ knowledge base with auto-managed storage"
-spec:
-  knowledgeBaseConfiguration:
-    type: "VECTOR"
-    vectorKnowledgeBaseConfiguration:
-      embeddingModelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v1"
-  storageConfiguration:
-    type: "OPENSEARCH_SERVERLESS"
-    openSearchServerless:                    # Enhanced configuration
-      collectionName: "customer-kb-collection"  # References auto-created collection
-      vectorIndexName: "customer-kb-index"
-      fieldMapping:
-        vectorField: "vector"
-        textField: "text"
-        metadataField: "metadata"
-  dataSources:
-    - name: "faq-documents"
-      type: "S3"
-      s3Configuration:
-        bucketArn: "arn:aws:s3:::company-kb-documents"
-        inclusionPrefixes: ["faq/"]
-      chunkingConfiguration:
-        chunkingStrategy: "FIXED_SIZE"
-        fixedSizeChunkingConfiguration:
-          maxTokens: 512
-          overlapPercentage: 20
-```
-
-**Using Existing OpenSearch Serverless Collection:**
+### 4. KnowledgeBase - Vector Knowledge Bases with Data Sources
 
 ```yaml
 kind: KnowledgeBase
 metadata:
-  name: "existing-collection-kb"
+  name: string (required)
+  description: string (optional)
 spec:
-  storageConfiguration:
-    type: "OPENSEARCH_SERVERLESS"
-    openSearchServerless:
-      collectionArn: "arn:aws:aoss:us-east-1:123456789012:collection/existing-kb"
-      vectorIndexName: "existing-index"
+  description: string (optional)
+  tags: map[string]string (optional)
+  
+  # Knowledge base configuration
+  knowledgeBaseConfiguration: (optional)
+    type: string (required) # "VECTOR"
+    vectorKnowledgeBaseConfiguration: (optional)
+      embeddingModelArn: string (required)
+      embeddingModelConfiguration: (optional)
+        bedrockEmbeddingModelConfiguration: (optional)
+          dimensions: int (optional)
+  
+  # Storage configuration (enhanced approach)
+  storageConfiguration: (optional)
+    type: string (required) # "OPENSEARCH_SERVERLESS"
+    openSearchServerless: (optional)
+      collectionArn: string (optional) # Existing collection
+      collectionId: string (optional)
+      collectionName: string (optional) # For auto-created collections
+      vectorIndexName: string (required)
       fieldMapping:
-        vectorField: "embedding_vector"
-        textField: "document_content" 
-        metadataField: "doc_metadata"
+        vectorField: string (required)
+        textField: string (required)
+        metadataField: string (required)
+  
+  # Data sources
+  dataSources: (optional)
+    - name: string (required)
+      type: string (required) # "S3"
+      s3Configuration: (optional)
+        bucketArn: string (required)
+        inclusionPrefixes: []string (optional)
+        exclusionPrefixes: []string (optional)
+      chunkingConfiguration: (optional)
+        chunkingStrategy: string (required) # "FIXED_SIZE", "NONE", "SEMANTIC"
+        fixedSizeChunkingConfiguration: (optional)
+          maxTokens: int (required)
+          overlapPercentage: int (required)
+        semanticChunkingConfiguration: (optional)
+          maxTokens: int (required)
+          bufferSize: int (required)
+          breakpointPercentileThreshold: int (required)
+      customTransformation: (optional)
+        transformationLambda: (optional)
+          lambdaArn: string (required)
+        intermediateStorage: (optional)
+          s3Location: (optional)
+            uri: string (required)
 ```
 
-**Legacy Configuration (Still Supported):**
+**Key Features:**
+- Integration with OpenSearchServerless collections (auto-created or existing)
+- Multiple data source types with advanced chunking strategies
+- Custom transformation support via Lambda
+- Vector embedding model configuration
+
+### 5. Prompt - Custom Prompt Templates with Tool Calling
 
 ```yaml
-storageConfiguration:
-  type: "OPENSEARCH_SERVERLESS"
-  opensearchServerlessConfiguration:  # Legacy format
-    collectionArn: "arn:aws:aoss:us-east-1:123456789012:collection/bedrock-kb"
-    vectorIndexName: "bedrock-knowledge-base-index"
-    fieldMapping:
-      vectorField: "vector"
-      textField: "text"
-      metadataField: "metadata"
+kind: Prompt
+metadata:
+  name: string (required)
+  description: string (optional)
+spec:
+  description: string (optional)
+  defaultVariant: string (optional)
+  customerEncryptionKeyArn: string (optional) # KMS encryption
+  tags: map[string]string (optional)
+  
+  # Prompt-level input variables
+  inputVariables: (optional)
+    - name: string (required)
+  
+  # Prompt variants (required)
+  variants: (required)
+    - name: string (required)
+      modelId: string (required)
+      templateType: string (required) # "TEXT" or "CHAT"
+      
+      # Template configuration
+      templateConfiguration: (optional)
+        # For TEXT template type
+        text: (optional)
+          text: string (required) # Template with {{variables}}
+          inputVariables: (optional)
+            - name: string (required)
+        
+        # For CHAT template type
+        chat: (optional)
+          messages: (optional)
+            - role: string (required) # "user", "assistant", "system"
+              content:
+                - text: string (optional)
+          system: (optional)
+            - text: string (required)
+          inputVariables: (optional)
+            - name: string (required)
+          toolConfiguration: (optional) # Function calling
+            tools: (optional)
+              - toolSpec: (optional)
+                  name: string (required)
+                  description: string (required)
+                  inputSchema: (optional)
+                    json: map[string]any (optional)
+            toolChoice: (optional)
+              auto: {} (optional)
+              any: {} (optional)
+              tool: (optional)
+                name: string (required)
+      
+      # Inference configuration
+      inferenceConfiguration: (optional)
+        text: (optional)
+          temperature: float64 (optional)
+          topP: float64 (optional)
+          topK: int (optional)
+          maxTokens: int (optional)
+          stopSequences: []string (optional)
+      
+      # Gen AI Resource (Agent integration)
+      genAiResource: (optional)
+        agent: (optional)
+          agentName: string (optional) # Reference to Agent resource
+          agentArn: string (optional) # Direct ARN
 ```
 
-### Guardrail Configuration
+**Key Features:**
+- Support for both TEXT and CHAT template types
+- Input variables with {{variable}} syntax
+- Function calling with JSON schemas
+- Tool choice strategies (auto, any, specific)
+- Agent integration for consistent behavior
+- KMS encryption support for enterprise scenarios
+
+### 6. Guardrail - Content Safety and Compliance
+
 ```yaml
 kind: Guardrail
 metadata:
-  name: "content-safety-guardrail"
-  description: "Enterprise content safety guardrail"
+  name: string (required)
+  description: string (optional)
 spec:
-  contentPolicyConfig:
+  description: string (optional)
+  tags: map[string]string (optional)
+  
+  # Content policy for harmful content
+  contentPolicyConfig: (optional)
     filtersConfig:
-      - type: "SEXUAL"
-        inputStrength: "HIGH"
-        outputStrength: "HIGH"
-      - type: "VIOLENCE"
-        inputStrength: "MEDIUM"
-        outputStrength: "HIGH"
-  sensitiveInformationPolicyConfig:
+      - type: string (required) # "SEXUAL", "VIOLENCE", "HATE", "INSULTS", "MISCONDUCT", "PROMPT_ATTACK"
+        inputStrength: string (required) # "NONE", "LOW", "MEDIUM", "HIGH"
+        outputStrength: string (required)
+  
+  # Sensitive information policy
+  sensitiveInformationPolicyConfig: (optional)
     piiEntitiesConfig:
-      - type: "EMAIL"
-        action: "BLOCK"
-      - type: "PHONE"
-        action: "ANONYMIZE"
+      - type: string (required) # "EMAIL", "PHONE", "SSN", etc.
+        action: string (required) # "BLOCK", "ANONYMIZE"
+  
+  # Contextual grounding policy
+  contextualGroundingPolicyConfig: (optional)
+    filtersConfig:
+      - type: string (required) # "GROUNDING", "RELEVANCE"
+        threshold: float64 (required) # 0.0 to 1.0
+  
+  # Topic policy for allowed/denied topics
+  topicPolicyConfig: (optional)
+    topicsConfig:
+      - name: string (required)
+        definition: string (required)
+        examples: []string (optional)
+        type: string (required) # "DENY"
+  
+  # Word policy for profanity filtering
+  wordPolicyConfig: (optional)
+    wordsConfig: (optional)
+      - text: string (required)
+    managedWordListsConfig: (optional)
+      - type: string (required) # "PROFANITY"
 ```
 
-### Prompt Configuration
+**Key Features:**
+- Comprehensive content filtering capabilities
+- PII detection and anonymization
+- Contextual grounding validation
+- Custom topic and word policies
+- Integration with agents via guardrail references
 
-**TEXT Template with Input Variables:**
-```yaml
-kind: Prompt
-metadata:
-  name: "customer-support-prompt"
-  description: "Customer support prompt with input variables"
-spec:
-  defaultVariant: "production"
-  
-  # Define input variables that can be used in templates
-  inputVariables:
-    - name: "query"
-    - name: "context"
-    - name: "customer_name"
-  
-  # Optional: Customer encryption key for sensitive prompts
-  customerEncryptionKeyArn: "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
-  
-  variants:
-    - name: "production"
-      modelId: "anthropic.claude-3-sonnet-20240229-v1:0"
-      templateType: "TEXT"
-      templateConfiguration:
-        text:
-          text: |
-            You are a professional customer support agent.
-            
-            Customer: {{customer_name}}
-            Query: {{query}}
-            Context: {{context}}
-            
-            Please provide a helpful response.
-          
-          # Define which variables this template uses
-          inputVariables:
-            - name: "query"
-            - name: "context"
-            - name: "customer_name"
-      
-      inferenceConfiguration:
-        text:
-          temperature: 0.1
-          topP: 0.9
-          topK: 50
-          maxTokens: 2048
-          stopSequences: ["Human:", "Assistant:"]
-```
-
-**CHAT Template with Tool Calling:**
-```yaml
-kind: Prompt
-metadata:
-  name: "ai-assistant-chat"
-  description: "Chat-based AI assistant with tool calling"
-spec:
-  defaultVariant: "production"
-  
-  inputVariables:
-    - name: "user_query"
-    - name: "user_name"
-  
-  variants:
-    - name: "production"
-      modelId: "anthropic.claude-3-sonnet-20240229-v1:0"
-      templateType: "CHAT"
-      templateConfiguration:
-        chat:
-          # System messages provide instructions
-          system:
-            - text: "You are a helpful AI assistant with access to tools."
-          
-          # Conversation messages (can include variables)
-          messages:
-            - role: "user"
-              content:
-                - text: "Hello, I'm {{user_name}}. {{user_query}}"
-          
-          # Tool configuration for function calling
-          toolConfiguration:
-            tools:
-              - toolSpec:
-                  name: "search_knowledge_base"
-                  description: "Search knowledge base for information"
-                  inputSchema:
-                    json:
-                      type: "object"
-                      properties:
-                        query:
-                          type: "string"
-                          description: "Search query"
-                        category:
-                          type: "string"
-                          enum: ["products", "policies", "faq"]
-                      required: ["query"]
-              
-              - toolSpec:
-                  name: "get_order_status"
-                  description: "Get customer order status"
-                  inputSchema:
-                    json:
-                      type: "object"
-                      properties:
-                        order_id:
-                          type: "string"
-                          description: "Order ID to look up"
-                      required: ["order_id"]
-            
-            # Tool choice configuration
-            toolChoice:
-              auto: {}  # Let the model decide when to use tools
-              # any: {}   # Model must use at least one tool
-              # tool:     # Force specific tool
-              #   name: "search_knowledge_base"
-          
-          inputVariables:
-            - name: "user_query"
-            - name: "user_name"
-      
-      inferenceConfiguration:
-        text:
-          temperature: 0.2
-          topP: 0.9
-          maxTokens: 4096
-```
-
-### Custom Module Configuration
-
-Include your own Terraform modules alongside Bedrock resources:
+### 7. OpenSearchServerless - Vector Collections for Knowledge Bases
 
 ```yaml
-kind: CustomModule
+kind: OpenSearchServerless
 metadata:
-  name: "s3-storage"
-  description: "S3 bucket for artifacts"
+  name: string (required)
+  description: string (optional)
 spec:
-  # Local module
-  source: "./modules/s3-bucket"
+  collectionName: string (required)
+  description: string (optional)
+  type: string (optional) # Default: "VECTORSEARCH"
+  tags: map[string]string (optional)
   
-  # Or Terraform registry module
-  # source: "terraform-aws-modules/s3-bucket/aws"
-  # version: "3.0.0"
+  # Security policies
+  encryptionPolicy: (optional)
+    name: string (optional)
+    description: string (optional)
+    type: string (optional)
+    kmsKeyId: string (optional)
   
-  # Or git repository module
-  # source: "git::https://github.com/org/repo.git"
-  # version: "v1.2.0"
+  networkPolicy: (optional)
+    name: string (optional)
+    description: string (optional)
+    type: string (optional)
+    access: (optional)
+      - sourceVPCEs: []string (optional)
+        sourceType: string (optional)
   
-  variables:
-    bucket_name: "bedrock-artifacts-${var.environment}"
-    versioning_enabled: true
-    # Support all variable types: strings, numbers, booleans, lists, objects
-    lifecycle_rules:
-      - id: "delete_old_versions"
-        enabled: true
-        noncurrent_version_expiration_days: 30
+  accessPolicy: (optional)
+    name: string (optional)
+    description: string (optional)
+    type: string (optional)
+    principals: []string (optional)
+    permissions: []string (optional)
+    autoConfigureForBedrock: bool (optional) # Simplified Bedrock permissions
   
-  # Optional dependencies
-  dependsOn:
-    - "vpc-module"
-    - "customer-support"  # Wait for agent creation
-  
-  tags:
-    Purpose: "BedrockStorage"
-    Environment: "${var.environment}"
+  # Vector index configuration
+  vectorIndex: (optional)
+    name: string (required)
+    fieldMapping:
+      vectorField: string (required)
+      textField: string (required)
+      metadataField: string (required)
 ```
 
-### IAMRole Configuration (Optional)
+**Key Features:**
+- Automatic security policy generation
+- Bedrock-optimized access policies
+- Vector index creation with proper field mapping
+- Integration with KnowledgeBase resources
 
-**Note: IAM roles are now automatically generated for all agents. Manual configuration is optional.**
+### 8. IAMRole - Custom IAM Roles (Optional)
+
 ```yaml
 kind: IAMRole
 metadata:
-  name: "custom-agent-execution-role"
-  description: "Custom IAM role for Bedrock agent"
+  name: string (required)
+  description: string (optional)
 spec:
-  assumeRolePolicy:
-    version: "2012-10-17"
+  description: string (optional)
+  tags: map[string]string (optional)
+  
+  # Assume role policy
+  assumeRolePolicy: (required)
+    version: string (required) # "2012-10-17"
     statement:
-      - effect: "Allow"
-        principal:
-          service: "bedrock.amazonaws.com"
-        action: "sts:AssumeRole"
-  policies:
-    - policyArn: "arn:aws:iam::aws:policy/service-role/AmazonBedrockAgentResourcePolicy"
-  inlinePolicies:
-    - name: "BedrockFoundationModelAccess"
+      - effect: string (required) # "Allow"
+        principal: map[string]interface{} (required)
+        action: string|[]string (required)
+        condition: map[string]interface{} (optional)
+  
+  # Managed policies
+  policies: (optional)
+    - policyArn: string (required)
+      policyName: string (optional)
+  
+  # Inline policies
+  inlinePolicies: (optional)
+    - name: string (required)
       policy:
-        version: "2012-10-17"
+        version: string (required)
         statement:
-          - effect: "Allow"
-            action:
-              - "bedrock:InvokeModel"
-              - "bedrock:InvokeModelWithResponseStream"
-            resource: "arn:aws:bedrock:*::foundation-model/*"
+          - sid: string (optional)
+            effect: string (required)
+            action: string|[]string (required)
+            resource: string|[]string (required)
+            condition: map[string]interface{} (optional)
 ```
 
-### Agent-Knowledge Base Association
+**Note:** IAM roles are automatically generated for agents and Lambda functions. Use custom IAMRole resources only for specific enterprise requirements.
 
-Link agents to knowledge bases (separate from agent definition):
+### 9. CustomResources - Include Your Own Terraform Files
 
 ```yaml
-kind: AgentKnowledgeBaseAssociation
+kind: CustomResources
 metadata:
-  name: "agent-faq-link"
-  description: "Link customer support agent to FAQ knowledge base"
+  name: string (required)
+  description: string (optional)
 spec:
-  agentName: "customer-support"     # Reference agent by name
-  knowledgeBaseName: "faq-kb"       # Reference knowledge base by name
-  # agentId: "ABCD1234"              # Or use direct IDs
-  # knowledgeBaseId: "EFGH5678"
-  description: "FAQ knowledge base for customer support"
-  state: "ENABLED"
+  # Directory containing .tf files OR specific files (mutually exclusive)
+  path: string (optional) # e.g., "./terraform/"
+  files: []string (optional) # e.g., ["sns.tf", "eventbridge.tf"]
+  
+  # Variables to pass to your Terraform configuration
+  variables: map[string]interface{} (optional)
+  
+  # Dependencies for proper ordering
+  dependsOn: []string (optional)
+  
+  # Description of what these resources provide
+  description: string (optional)
 ```
 
-## CLI Usage
+**Example Terraform Files:**
+```hcl
+# terraform/sns.tf
+resource "aws_sns_topic" "agent_notifications" {
+  name = var.sns_topic_name
+  
+  tags = {
+    Environment = var.environment
+    ManagedBy   = "bedrock-forge"
+  }
+}
 
-**Core Commands:**
-```bash
-# Discover and scan resources in directory
-bedrock-forge scan [path]
-
-# Validate YAML syntax and dependencies
-bedrock-forge validate [path] [--profile enterprise|custom] [--config path/to/config.yml]
-
-# Generate Terraform modules from YAML
-bedrock-forge generate [path] [output-dir]
-
-# Show version information
-bedrock-forge version
+output "sns_topic_arn" {
+  value = aws_sns_topic.agent_notifications.arn
+}
 ```
 
-**Validation Modes:**
-- **Default**: Development-friendly validation with basic checks
-- **Enterprise**: Production-ready validation with strict governance policies
-- **Custom**: User-defined validation rules via configuration file
-
-## Getting Started Guide
-
-### Prerequisites
-
-Before starting, ensure you have:
-- **Go 1.21+** installed
-- **AWS CLI** configured with appropriate credentials
-- **Terraform 1.0+** installed
-- **Git repository** for your project
-- **AWS account** with Bedrock access enabled
-
-### Installation
-
-**Option 1: Global Installation (Recommended)**
-```bash
-go install github.com/your-org/bedrock-forge/cmd/bedrock-forge@latest
-bedrock-forge version
-```
-
-**Option 2: Clone and Build**
-```bash
-git clone https://github.com/your-org/bedrock-forge
-cd bedrock-forge
-go build -o bedrock-forge ./cmd/bedrock-forge
-./bedrock-forge version
-```
-
-### Quick Start: Create Your First Agent
-
-**Step 1: Create Project Directory**
-```bash
-mkdir my-bedrock-project
-cd my-bedrock-project
-```
-
-**Step 2: Create Simple Agent**
-```bash
-# Create agent.yml
-cat > agent.yml << 'EOF'
+**Cross-Reference in Agents:**
+```yaml
 kind: Agent
 metadata:
-  name: "hello-agent"
-  description: "My first Bedrock agent"
+  name: notification-agent
 spec:
-  foundationModel: "anthropic.claude-3-sonnet-20240229-v1:0"
-  instruction: "You are a helpful AI assistant that provides clear and concise answers."
-  idleSessionTtlInSeconds: 3600
-  
-  tags:
-    Environment: "dev"
-    Project: "my-first-agent"
-    Owner: "developer@company.com"
-EOF
+  environment:
+    SNS_TOPIC_ARN: "${aws_sns_topic.agent_notifications.arn}"
+  dependsOn:
+    - infrastructure
 ```
 
-**Step 3: Generate and Deploy**
-```bash
-# Validate configuration
-bedrock-forge validate .
+**Key Features:**
+- Include any AWS resource using standard Terraform syntax
+- Cross-reference resources in agent configurations
+- Variable support with automatic merging
+- Single unified deployment with all resources
 
-# Generate Terraform
-bedrock-forge generate . ./terraform
+## GitHub Actions CI/CD Workflows
 
-# Deploy with Terraform
-cd terraform
-terraform init
-terraform plan
-terraform apply
+### Validation Workflow (bedrock-forge-validate.yml)
+
+**Purpose:** Validate YAML configurations and generate Terraform plans for pull requests
+
+```yaml
+# .github/workflows/validate-bedrock.yml
+name: Validate Bedrock Configuration
+
+on:
+  pull_request:
+    branches: [main]
+    paths: ['**/*.yml', '**/*.yaml']
+
+jobs:
+  validate:
+    uses: your-org/bedrock-forge/.github/workflows/bedrock-forge-validate.yml@main
+    secrets: inherit
 ```
 
-### Adding Lambda Functions
+**Features:**
+- YAML validation and resource scanning
+- Terraform generation and planning
+- S3 storage of generated modules with commit hash
+- PR comments with plan results and artifact links
+- Read-only validation (no deployments)
 
-**Step 1: Create Lambda Function**
-```bash
-# Create lambda.yml
-cat > lambda.yml << 'EOF'
+### Deployment Workflow (bedrock-forge-deploy.yml)
+
+**Purpose:** Deploy pre-validated Terraform configurations to environments
+
+```yaml
+# .github/workflows/deploy-bedrock.yml
+name: Deploy Bedrock Agents
+
+on:
+  push:
+    branches: [main]
+    paths: ['**/*.yml', '**/*.yaml']
+
+jobs:
+  deploy-dev:
+    uses: your-org/bedrock-forge/.github/workflows/bedrock-forge-deploy.yml@main
+    with:
+      environment: dev
+      aws_role: ${{ secrets.AWS_DEPLOYMENT_ROLE }}
+      tf_state_bucket: ${{ secrets.TERRAFORM_STATE_BUCKET }}
+    secrets: inherit
+```
+
+**Features:**
+- Downloads pre-validated Terraform from S3
+- Environment-specific deployments with approval
+- State management with S3 backend
+- Deployment summaries with resource outputs
+
+**Required Secrets:**
+```
+AWS_VALIDATION_ROLE=arn:aws:iam::account:role/validation-role
+AWS_DEPLOYMENT_ROLE=arn:aws:iam::account:role/deployment-role
+TERRAFORM_ARTIFACTS_BUCKET=your-terraform-artifacts-bucket
+TERRAFORM_STATE_BUCKET=your-terraform-state-bucket
+```
+
+**S3 Storage Structure:**
+```
+s3://terraform-artifacts-bucket/
+├── generated-modules/abc123def456/  # Commit hash
+│   ├── main.tf, variables.tf, outputs.tf
+├── terraform-plans/abc123def456/
+│   ├── plan.txt, plan-detailed.txt
+```
+
+## Common Patterns and Examples
+
+### 1. Basic Agent with Lambda Action Group
+
+```yaml
+# lambda.yml
 kind: Lambda
 metadata:
-  name: "weather-lookup"
-  description: "Get weather information"
+  name: order-lookup
 spec:
-  runtime: "python3.11"
-  handler: "app.handler"
+  runtime: python3.9
+  handler: app.handler
   code:
-    source: "directory"  # Code in same directory
-  environment:
-    API_KEY: "your-weather-api-key"
-  timeout: 30
-  memorySize: 256
-  
-  tags:
-    Environment: "dev"
-    Project: "weather-service"
-EOF
-```
+    source: directory
 
-**Step 2: Create Lambda Code**
-```bash
-# Create app.py
-cat > app.py << 'EOF'
-import json
-import os
-
-def handler(event, context):
-    # Extract function name and parameters
-    function_name = event.get('function', '')
-    parameters = event.get('parameters', {})
-    
-    if function_name == 'get_weather':
-        location = parameters.get('location', 'Unknown')
-        # Mock weather data - replace with real API call
-        weather_data = {
-            'location': location,
-            'temperature': '22°C',
-            'condition': 'Sunny',
-            'humidity': '45%'
-        }
-        return {
-            'statusCode': 200,
-            'body': json.dumps(weather_data)
-        }
-    
-    return {
-        'statusCode': 400,
-        'body': json.dumps({'error': 'Unknown function'})
-    }
-EOF
-```
-
-**Step 3: Update Agent with Action Group**
-```bash
-# Update agent.yml
-cat > agent.yml << 'EOF'
+# agent.yml
 kind: Agent
 metadata:
-  name: "weather-agent"
-  description: "Agent with weather lookup capability"
+  name: customer-support
 spec:
   foundationModel: "anthropic.claude-3-sonnet-20240229-v1:0"
-  instruction: "You are a helpful weather assistant. Use the get_weather function to provide current weather information for any location."
-  idleSessionTtlInSeconds: 3600
-  
-  # Inline action groups
+  instruction: "You are a helpful customer support agent..."
   actionGroups:
-    - name: "weather-tools"
-      description: "Weather lookup tools"
+    - name: order-management
       actionGroupExecutor:
-        lambda: "weather-lookup"  # References Lambda above
+        lambda: order-lookup
       functionSchema:
         functions:
-          - name: "get_weather"
-            description: "Get current weather for a location"
+          - name: lookup_order
+            description: "Look up customer order by ID"
             parameters:
-              location:
-                type: "string"
-                description: "City name or location"
+              order_id:
+                description: "The order ID to look up"
                 required: true
-  
-  tags:
-    Environment: "dev"
-    Project: "weather-agent"
-    Owner: "developer@company.com"
-EOF
+                type: string
 ```
 
-### Adding Knowledge Base
+### 2. Knowledge Base with Custom Infrastructure
 
-**Step 1: Create Knowledge Base**
-```bash
-# Create knowledge-base.yml
-cat > knowledge-base.yml << 'EOF'
+```yaml
+# infrastructure.yml
+kind: CustomResources
+metadata:
+  name: vector-infrastructure
+spec:
+  files: ["s3.tf", "opensearch.tf"]
+  variables:
+    bucket_name: "knowledge-base-docs"
+
+# knowledge-base.yml
 kind: KnowledgeBase
 metadata:
-  name: "company-faq"
-  description: "Company FAQ knowledge base"
+  name: company-docs
 spec:
   knowledgeBaseConfiguration:
-    type: "VECTOR"
+    type: VECTOR
     vectorKnowledgeBaseConfiguration:
       embeddingModelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v1"
-  
   storageConfiguration:
-    type: "OPENSEARCH_SERVERLESS"
+    type: OPENSEARCH_SERVERLESS
     openSearchServerless:
-      collectionArn: "arn:aws:aoss:us-east-1:123456789012:collection/kb-collection"
-      vectorIndexName: "knowledge-index"
+      collectionName: "${aws_opensearchserverless_collection.kb_collection.name}"
+      vectorIndexName: "knowledge-base-index"
       fieldMapping:
         vectorField: "vector"
         textField: "text"
         metadataField: "metadata"
-  
   dataSources:
-    - name: "faq-documents"
-      type: "S3"
+    - name: company-documents
+      type: S3
       s3Configuration:
-        bucketArn: "arn:aws:s3:::company-docs"
-        inclusionPrefixes: ["faq/"]
-      chunkingConfiguration:
-        chunkingStrategy: "FIXED_SIZE"
-        fixedSizeChunkingConfiguration:
-          maxTokens: 512
-          overlapPercentage: 20
-  
-  tags:
-    Environment: "dev"
-    Project: "company-kb"
-EOF
+        bucketArn: "${aws_s3_bucket.docs.arn}"
+  dependsOn:
+    - vector-infrastructure
 ```
 
-**Step 2: Link Agent to Knowledge Base**
-```bash
-# Create agent-kb-association.yml
-cat > agent-kb-association.yml << 'EOF'
-kind: AgentKnowledgeBaseAssociation
+### 3. Prompt with Tool Calling
+
+```yaml
+kind: Prompt
 metadata:
-  name: "weather-agent-faq-link"
-  description: "Link weather agent to company FAQ"
+  name: function-calling-prompt
 spec:
-  agentName: "weather-agent"
-  knowledgeBaseName: "company-faq"
-  description: "Company FAQ for weather agent"
-  state: "ENABLED"
-EOF
+  variants:
+    - name: default
+      modelId: "anthropic.claude-3-sonnet-20240229-v1:0"
+      templateType: CHAT
+      templateConfiguration:
+        chat:
+          system:
+            - text: "You are a helpful assistant that can call functions to help users."
+          inputVariables:
+            - name: query
+          toolConfiguration:
+            tools:
+              - toolSpec:
+                  name: get_weather
+                  description: "Get current weather for a location"
+                  inputSchema:
+                    json:
+                      type: object
+                      properties:
+                        location:
+                          type: string
+                          description: "City name"
+                      required: [location]
+            toolChoice:
+              auto: {}
 ```
 
-### Complete Deployment Workflow
+### 4. Enterprise Agent with Guardrails
 
-**Step 1: Validate All Resources**
-```bash
-bedrock-forge validate .
-```
-
-**Step 2: Generate Terraform**
-```bash
-bedrock-forge generate . ./terraform
-```
-
-**Step 3: Review Generated Terraform**
-```bash
-ls ./terraform/
-# main.tf - Generated Terraform configuration
-# variables.tf - Input variables
-# outputs.tf - Module outputs
-```
-
-**Step 4: Deploy Infrastructure**
-```bash
-cd terraform
-terraform init
-terraform plan
-terraform apply
-```
-
-**Step 5: Test Your Agent**
-```bash
-# Use AWS CLI or Console to test agent
-aws bedrock-agent-runtime invoke-agent \
-  --agent-id <agent-id> \
-  --agent-alias-id <alias-id> \
-  --session-id test-session \
-  --input-text "What's the weather like in London?"
-```
-
-### Best Practices for Getting Started
-
-1. **Start Simple**: Begin with a basic agent, then add features incrementally
-2. **Use Validation**: Always run `bedrock-forge validate` before generation
-3. **Version Control**: Keep YAML configurations in Git for tracking changes
-4. **Environment Separation**: Use different directories for dev/staging/prod
-5. **Test Locally**: Validate YAML and Terraform generation before deployment
-6. **Monitor Costs**: Be aware of AWS Bedrock pricing for foundation models
-7. **Security**: Use appropriate IAM roles and don't commit sensitive data
-
-## IAM Management
-
-**🎉 IAM roles are automatically generated for all Bedrock resources!** No manual configuration required.
-
-Every Bedrock resource gets appropriate IAM permissions automatically:
-- **Agents**: Foundation model access, Lambda invocation, knowledge base access, CloudWatch logging
-- **Lambda Functions**: Execution roles with VPC access and CloudWatch logging
-- **Action Groups**: Inherit permissions from associated agent roles
-- **Knowledge Bases**: S3 access and OpenSearch operations
-
-### Auto-Generated Agent IAM Roles
-
-When you create an Agent, Bedrock Forge automatically generates:
-1. **IAM Role**: `bedrock-agent-{agent-name}-role`
-2. **IAM Policy**: `bedrock-agent-{agent-name}-policy`
-
-#### Foundation Model Access
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "bedrock:InvokeModel",
-        "bedrock:InvokeModelWithResponseStream",
-        "bedrock:GetInferenceProfile",
-        "bedrock:ListInferenceProfiles", 
-        "bedrock:UseInferenceProfile"
-      ],
-      "Resource": "*"
-    }
-  ]
-}
-```
-
-#### Lambda Invocation (for Action Groups)
-Auto-generated when agents reference Lambda functions:
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": ["lambda:InvokeFunction"],
-      "Resource": "arn:aws:lambda:region:account:function:function-name"
-    }
-  ]
-}
-```
-
-#### Knowledge Base Access
-Auto-generated when agents are associated with knowledge bases:
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "bedrock:Retrieve",
-        "bedrock:RetrieveAndGenerate"
-      ],
-      "Resource": "arn:aws:bedrock:region:account:knowledge-base/*"
-    }
-  ]
-}
-```
-
-#### CloudWatch Logging
-Always included for debugging and monitoring:
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "logs:CreateLogGroup",
-        "logs:CreateLogStream",
-        "logs:PutLogEvents"
-      ],
-      "Resource": "arn:aws:logs:*:*:*"
-    }
-  ]
-}
-```
-
-### Lambda Resource-Based Policies
-
-Lambda functions automatically get resource-based policies allowing Bedrock agent invocation:
-
-#### Agent-Specific Permissions
-When agents reference Lambda functions, automatic creation of agent-specific permissions:
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {"Service": "bedrock.amazonaws.com"},
-      "Action": "lambda:InvokeFunction",
-      "Resource": "arn:aws:lambda:region:account:function:function-name",
-      "Condition": {
-        "StringEquals": {
-          "aws:SourceArn": "arn:aws:bedrock:region:account:agent/agent-id"
-        }
-      }
-    }
-  ]
-}
-```
-
-#### General Bedrock Permissions
-For Lambda functions not yet referenced by agents:
-```json
-{
-  "Version": "2012-10-17", 
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {"Service": "bedrock.amazonaws.com"},
-      "Action": "lambda:InvokeFunction",
-      "Resource": "arn:aws:lambda:region:account:function:function-name"
-    }
-  ]
-}
-```
-
-### Custom IAM Configuration
-
-For enterprise scenarios requiring specific permissions, you can define custom IAM roles:
-
-#### Manual IAM Role Resource
 ```yaml
-kind: IAMRole
+# guardrail.yml
+kind: Guardrail
 metadata:
-  name: "custom-agent-role"
-  description: "Custom IAM role for enterprise agent"
+  name: enterprise-safety
 spec:
-  assumeRolePolicy:
-    version: "2012-10-17"
-    statement:
-      - effect: "Allow"
-        principal:
-          service: "bedrock.amazonaws.com"
-        action: "sts:AssumeRole"
-  policies:
-    - policyArn: "arn:aws:iam::aws:policy/service-role/AmazonBedrockAgentResourcePolicy"
-  inlinePolicies:
-    - name: "CustomBedrockAccess"
-      policy:
-        version: "2012-10-17"
-        statement:
-          - effect: "Allow"
-            action: ["bedrock:InvokeModel"]
-            resource: "arn:aws:bedrock:*::foundation-model/anthropic.*"
-  tags:
-    Purpose: "BedrockAgent"
-    Compliance: "SOC2"
-```
-
-#### Custom Lambda Resource Policy
-For advanced scenarios, Lambda functions can include custom resource policies:
-```yaml
-kind: Lambda
-metadata:
-  name: "secure-lambda"
-spec:
-  runtime: "python3.11"
-  handler: "app.handler"
-  code:
-    source: "directory"
-  
-  # Optional: Custom resource policy for advanced scenarios
-  resourcePolicy:
-    version: "2012-10-17"
-    statement:
-      - effect: "Allow"
-        principal:
-          service: "bedrock.amazonaws.com"
-        action: "lambda:InvokeFunction"
-        condition:
-          StringEquals:
-            "aws:SourceAccount": "123456789012"
-      - effect: "Allow"
-        principal:
-          aws: "arn:aws:iam::456789012345:root"  # Cross-account access
-        action: "lambda:InvokeFunction"
-```
-
-### IAM Best Practices
-
-#### Development Environment
-- Use auto-generated IAM roles for simplicity
-- Rely on default permissions for rapid prototyping
-- Monitor CloudWatch logs for permission issues
-
-#### Production Environment
-- Review auto-generated policies before deployment
-- Consider custom IAM roles for compliance requirements
-- Implement least-privilege access controls
-- Use resource-specific ARNs instead of wildcards
-
-#### Enterprise Compliance
-- Define custom IAM roles with organization-specific policies
-- Include mandatory tags for cost allocation and compliance
-- Implement cross-account access controls for shared resources
-- Use AWS IAM Access Analyzer to validate permissions
-
-#### Security Monitoring
-- Enable CloudTrail for IAM policy changes
-- Monitor unusual API calls in CloudWatch
-- Implement alerting for permission errors
-- Regular audit of generated IAM policies
-
-### Troubleshooting IAM Issues
-
-#### Common Permission Errors
-1. **Agent can't invoke foundation models**: Check Bedrock service availability in region
-2. **Action group Lambda failures**: Verify Lambda resource-based policy exists
-3. **Knowledge base access denied**: Confirm agent-KB association exists
-4. **Cross-account access issues**: Review resource-based policies and trust relationships
-
-#### Debug Commands
-```bash
-# Check generated IAM policies
-aws iam get-role-policy --role-name bedrock-agent-{agent-name}-role --policy-name bedrock-agent-{agent-name}-policy
-
-# Verify Lambda resource policy
-aws lambda get-policy --function-name {function-name}
-
-# List agent permissions
-aws bedrock describe-agent --agent-id {agent-id}
-```
-
-## Key Capabilities
-
-### Dependency Management
-Resources are automatically ordered and resolved:
-1. **IAMRole** → **Guardrail** → **Prompt** → **Lambda** → **OpenSearchServerless** → **KnowledgeBase** → **ActionGroup** → **Agent**
-2. Cross-resource references use Terraform module outputs (e.g., `${module.guardrail.guardrail_id}`)
-3. Validation ensures all referenced resources exist before generation
-
-### Artifact Packaging
-- **Lambda Functions**: Automatic ZIP packaging of co-located code directories
-- **OpenAPI Schemas**: Upload to S3 with versioned keys for Action Group integration
-- **S3 Management**: Unique artifact keys using timestamp + content hash
-
-## Generated Terraform Example
-
-```hcl
-terraform {
-  required_version = ">= 1.0"
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
-}
-
-variable "project_name" {
-  description = "Name of the project"
-  type        = string
-  default     = "bedrock-forge"
-}
-
-variable "environment" {
-  description = "Environment name"
-  type        = string
-  default     = "dev"
-}
-
-module "content_safety_guardrail" {
-  source = "git::https://github.com/org/terraform-modules//bedrock-guardrail?ref=v1.0.0"
-  
-  name        = "content-safety-guardrail"
-  description = "Enterprise content safety guardrail"
-  
-  content_policy_config = {
-    filters_config = [
-      {
-        type            = "SEXUAL"
-        input_strength  = "HIGH"
-        output_strength = "HIGH"
-      }
-    ]
-  }
-  
-  tags = {
-    Environment = var.environment
-    Project     = var.project_name
-  }
-}
-
-module "customer_support_agent" {
-  source = "git::https://github.com/org/terraform-modules//bedrock-agent?ref=v1.0.0"
-  
-  name               = "customer-support"
-  foundation_model   = "anthropic.claude-3-sonnet-20240229-v1:0"
-  instruction        = "You are a helpful customer support agent..."
-  
-  guardrail_id      = module.content_safety_guardrail.guardrail_id
-  knowledge_base_id = module.faq_kb.knowledge_base_id
-  
-  tags = {
-    Environment = var.environment
-    Project     = var.project_name
-  }
-}
-
-output "agent_arn" {
-  description = "ARN of the created Bedrock agent"
-  value       = module.customer_support_agent.agent_arn
-}
-```
-
-### Enterprise Governance
-- **Naming Conventions**: Enforce patterns like `{team}-{environment}-{name}-{type}`
-- **Tagging Policies**: Require tags for cost allocation, compliance, and ownership
-- **Security Validation**: IAM policy scanning, Lambda security requirements, network policies
-- **Multi-Environment**: Different validation profiles for dev/staging/production
-
-## Enterprise Validation Features
-
-**Naming Convention Enforcement:**
-- Flexible patterns: `{team}-{environment}-{name}-{type}`
-- Example: `data-prod-customer-support-agent`
-- Regex-based validation with team-specific rules
-
-**Mandatory Tagging:**
-```yaml
-# Required enterprise tags
-tags:
-  Environment: "prod"                    # Environment identifier
-  Project: "customer-support-platform"  # Project name
-  Owner: "john.doe@company.com"         # Resource owner
-  CostCenter: "CC-123456"               # Cost allocation
-  Team: "data"                          # Organizational team
-  BusinessUnit: "engineering"           # Business unit
-  DataClassification: "internal"        # Data sensitivity
-  ComplianceLevel: "pci"                # Compliance requirements
-```
-
-**Security Policy Validation:**
-- IAM policy scanning for forbidden actions and MFA requirements
-- Lambda security validation (VPC, timeouts, runtime versions)
-- Agent security requirements (guardrails, encryption, memory configuration)
-- Network security validation for VPC and security group configurations
-
-## GitHub Actions Integration
-
-**Reusable Workflow for Validation & Deployment:**
-
-The project includes a comprehensive GitHub Actions workflow (`bedrock-forge-deploy.yml`) that provides:
-
-**Workflow Features:**
-- **Validation-First Approach**: Defaults to validation-only mode for cost-effective testing
-- **Multi-stage Pipeline**: Validate → Package → Deploy → Cleanup (conditional)
-- **Resource Scanning**: Automatic discovery of Lambda functions, schemas, and Bedrock resources
-- **Artifact Management**: Automated packaging of Lambda code and OpenAPI schemas (when deploying)
-- **Environment Support**: Dev, staging, and production with different validation levels
-- **Dry Run Mode**: Plan-only mode for reviewing changes before deployment
-- **State Management**: S3 backend with DynamoDB locking for Terraform state
-
-**Usage in Your Repository:**
-
-**Validation-Only Mode (Default - No AWS Costs):**
-```yaml
-name: Validate Bedrock Configurations
-on:
-  push:
-    branches: [main, develop]
-    paths: ['agents/**', 'lambdas/**', 'action-groups/**', 'knowledge-bases/**']
-  pull_request:
-    paths: ['agents/**', 'lambdas/**', 'action-groups/**', 'knowledge-bases/**']
-
-jobs:
-  validate:
-    uses: ./.github/workflows/bedrock-forge-deploy.yml
-    with:
-      validation_only: true  # Default: true (no deployment, no AWS costs)
-      source_path: '.'
-    # No secrets needed for validation-only mode
-```
-
-**Full Deployment Mode:**
-```yaml
-name: Deploy Bedrock Agents
-on:
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Environment to deploy'
-        required: true
-        default: 'dev'
-        type: choice
-        options: ['dev', 'staging', 'prod']
-      dry_run:
-        description: 'Run in dry-run mode'
-        required: false
-        default: false
-        type: boolean
-
-jobs:
-  deploy:
-    uses: ./.github/workflows/bedrock-forge-deploy.yml
-    with:
-      validation_only: false  # Enable deployment
-      environment: ${{ github.event.inputs.environment || 'dev' }}
-      aws_region: 'us-east-1'
-      aws_role: 'arn:aws:iam::123456789012:role/bedrock-forge-deploy-role'
-      tf_state_bucket: 'my-terraform-state-bucket'
-      tf_state_key_prefix: 'bedrock-forge'
-      tf_state_lock_table: 'terraform-state-lock'
-      dry_run: ${{ github.event.inputs.dry_run || false }}
-      source_path: '.'
-    secrets: inherit
-```
-
-**Parameters:**
-
-**Always Optional:**
-- `validation_only`: Run validation only without deployment (default: true)
-- `source_path`: Path to YAML configurations (default: .)
-- `terraform_version`: Terraform version (default: 1.5.0)
-- `go_version`: Go version for building Bedrock Forge (default: 1.21)
-- `bedrock_forge_version`: Version/ref of Bedrock Forge to use (default: main)
-
-**Required for Deployment (when validation_only is false):**
-- `aws_role`: IAM role ARN for deployment
-- `tf_state_bucket`: S3 bucket for Terraform state storage
-- `environment`: Target environment (dev/staging/prod)
-- `aws_region`: AWS region for deployment
-
-**Optional for Deployment:**
-- `tf_state_key_prefix`: Key prefix for Terraform state (default: bedrock-forge)
-- `tf_state_lock_table`: DynamoDB table for state locking
-- `aws_session_name`: AWS session name for assumed role (default: bedrock-forge-deploy)
-- `dry_run`: Plan-only mode without applying changes (default: false)
-
-**Multi-Environment Support:**
-
-**Validation-Only Mode (Default):**
-- **All Environments**: Fast validation, no AWS costs, runs on every push/PR
-- **Immediate Feedback**: Catch configuration errors before deployment
-- **Cost-Effective**: No AWS resources created, no deployment charges
-
-**Deployment Mode (Optional):**
-- **Development**: Minimal validation, rapid iteration, manual trigger
-- **Staging**: Full validation, integration testing, manual approval
-- **Production**: Enterprise validation, approval workflows, protected branches
-
-**Security Features:**
-- **No Credentials for Validation**: Validation-only mode requires no AWS credentials
-- **AWS OIDC Authentication**: No long-lived credentials for deployment
-- **IAM Roles with Least Privilege**: Environment-specific role assumption
-- **State Management**: Secure S3 backend with DynamoDB locking
-- **Artifact Isolation**: Environment-specific artifact storage
-- **Approval Workflows**: Manual approval gates for production deployments
-
-**Pipeline Stages:**
-1. **Validate**: YAML syntax validation and resource scanning (always runs)
-2. **Package**: Lambda code packaging and schema uploads (only when deploying)
-3. **Deploy**: Terraform planning and application with state management (only when deploying)
-4. **Summary**: Pipeline summary and results (always runs)
-
-## Usage Patterns
-
-**Resource References:**
-```yaml
-# Reference other resources by name in YAML configurations
-spec:
-  guardrail:
-    name: "content-safety-guardrail"  # References Guardrail resource
-  actionGroups:
-    - name: "order-management"        # References ActionGroup resource
-```
-
-**Lambda Function References:**
-```yaml
-# Option 1: Reference Lambda defined in same project
-actionGroupExecutor:
-  lambda: "order-lookup"  # References local Lambda resource
-
-# Option 2: Reference existing Lambda by ARN (shared Lambda)
-actionGroupExecutor:
-  lambdaArn: "arn:aws:lambda:us-east-1:123456789012:function:shared-service"
-```
-
-**Environment-Specific Configurations:**
-```yaml
-# Configure different values per environment
-spec:
-  foundationModel: "anthropic.claude-3-sonnet-20240229-v1:0"
-  idleSessionTtlInSeconds: 3600  # Production: longer sessions
-  # Development might use: 300 seconds for faster iteration
-```
-
-**Artifact Management:**
-- **Lambda Code**: Co-locate source code with YAML files for automatic packaging
-- **OpenAPI Schemas**: Provide manual schema files for automatic S3 upload
-- **Versioning**: Automatic unique keys using timestamp + content hash
-
-**Cross-Resource Dependencies:**
-- Validation ensures all referenced resources exist before generation
-- Resources are generated in proper dependency order automatically
-- Terraform module outputs handle cross-resource references seamlessly
-
-## Recent Feature Enhancements
-
-**Enhanced Prompt Resource (Latest Update):**
-
-The Prompt resource has been significantly enhanced to support all AWS Bedrock Terraform provider features:
-
-**New Capabilities:**
-- **Input Variables**: Define and use variables like `{{query}}`, `{{context}}`, `{{user_name}}` in templates
-- **CHAT Template Type**: Support for conversational templates with system messages, user/assistant exchanges
-- **Tool Calling**: Function calling capabilities with JSON schemas and tool choice strategies
-- **Customer Encryption**: KMS key support for sensitive prompt templates
-- **Enhanced Inference**: Added topK parameter, better parameter handling with pointers
-- **Template-Level Variables**: Variables can be defined globally or per-template for flexibility
-
-**Key Features:**
-1. **Dual Template Types**: TEXT (simple prompts) and CHAT (conversational with tools)
-2. **Variable Management**: Proper scope and validation for prompt variables
-3. **Function Calling**: Complete tool configuration with auto/any/specific tool choices
-4. **Agent Association**: Direct integration with agents via genAiResource configuration
-5. **Security**: Optional KMS encryption for sensitive enterprise prompts
-6. **Backward Compatibility**: Existing TEXT prompts continue to work unchanged
-
-**Use Cases:**
-- **TEXT Templates**: Simple prompts with variable substitution for agent orchestration
-- **CHAT Templates**: Complex conversational agents with tool access and multi-turn dialogs
-- **Function Calling**: Agents that can call external APIs, search knowledge bases, or execute actions
-- **Agent Integration**: Prompts directly associated with specific agents for consistent behavior
-- **Enterprise Security**: Encrypted prompts for sensitive business logic and proprietary instructions
-
-**Migration Path:**
-- Existing prompts continue to work without changes
-- New features are opt-in through updated YAML structure
-- Enhanced generator handles both old and new formats seamlessly
-
-**Enhanced Lambda Resource-Based Policies (Current Update):**
-
-bedrock-forge now provides comprehensive management of Lambda function resource-based policies for Bedrock agent integration:
-
-**New Capabilities:**
-- **Automatic Permission Management**: Default `bedrock.amazonaws.com` invoke permissions on all Lambda functions
-- **Agent-Specific Permissions**: Auto-generated `aws_lambda_permission` resources with source ARN restrictions per agent
-- **Custom Resource Policies**: Full control over Lambda resource-based policies through YAML configuration
-- **Security Best Practices**: Account-specific and cross-account access controls with condition support
-- **Dependency Management**: Proper Terraform ordering between agents, Lambda functions, and permissions
-
-**Key Features:**
-1. **Default Security**: Every Lambda gets basic Bedrock service permissions automatically
-2. **Enhanced Security**: Agent-specific permissions with `arn:aws:bedrock:region:account:agent/agent-id` source ARN patterns
-3. **Custom Policies**: Additional policy statements for enterprise scenarios (cross-account access, etc.)
-4. **Zero Configuration**: Works out-of-the-box for simple agent-to-Lambda scenarios
-5. **Enterprise Control**: Full policy customization for complex organizational requirements
-
-**Use Cases:**
-- **Simple Agents**: Default permissions handle basic agent-to-Lambda invocation automatically
-- **Multi-Agent Systems**: Each agent gets specific permissions to only invoke its referenced Lambda functions
-- **Cross-Account Access**: Custom policies for shared Lambda functions across AWS accounts
-- **Enterprise Compliance**: Account restrictions and conditional access for organizational security standards
-
-**Implementation Details:**
-- **Zero-Configuration Default**: Lambda functions require no resource policy configuration - permissions are handled automatically
-- **Intelligent Agent Detection**: Lambda generator scans all agents during generation to detect references and create appropriate permissions
-- **Agent-Specific Security**: Each agent gets permissions only for Lambda functions it actually references, with source ARN restrictions
-- **Automatic Policy Generation**: Resource-based policies are created directly in the Lambda module, eliminating separate permission resources
-- **Optional Customization**: Advanced users can still add custom `resourcePolicy` statements for enterprise scenarios
-
-## Enterprise Validation Guide
-
-Bedrock Forge provides comprehensive enterprise-grade validation capabilities that enforce organizational standards for resource naming, tagging, and security compliance.
-
-### Validation Profiles
-
-#### Default Profile
-Development-friendly validation with basic checks:
-- Basic YAML syntax validation
-- Resource dependency validation
-- Simple naming pattern checks
-- Optional tagging requirements
-
-#### Enterprise Profile
-Production-ready validation with strict governance policies:
-- **Resource Naming Convention Enforcement**: Flexible regex patterns, team-specific rules, environment-aware naming
-- **Mandatory Tagging**: Cost allocation, compliance tracking, resource-specific requirements
-- **Security Policy Validation**: IAM policy scanning, Lambda security, agent security, network security
-- **Comprehensive Coverage**: All resource types with organizational standards
-
-#### Custom Profile
-User-defined validation rules via configuration file for organization-specific requirements.
-
-### Enterprise Validation Configuration
-
-#### Naming Convention Enforcement
-```yaml
-# validation.yml
-profiles:
-  enterprise:
-    naming:
-      patterns:
-        agent: "^[a-z][a-z0-9-]*-agent$"
-        lambda: "^[a-z][a-z0-9-]*-lambda$"
-        action_group: "^[a-z][a-z0-9-]*-ag$"
-      team_specific:
-        data_team: "^data-.*"
-        ml_team: "^ml-.*"
-```
-
-#### Mandatory Tagging
-```yaml
-# Required enterprise tags
-validation:
-  tagging:
-    required_tags:
-      - Environment    # Environment identifier
-      - Project        # Project name
-      - Owner          # Resource owner email
-      - CostCenter     # Cost allocation
-      - Team           # Organizational team
-      - BusinessUnit   # Business unit
-      - DataClassification  # Data sensitivity
-      - ComplianceLevel     # Compliance requirements
-    
-    patterns:
-      Owner: "^[a-z.]+@company\\.com$"
-      Environment: "^(dev|staging|prod)$"
-```
-
-#### Security Policy Validation
-```yaml
-validation:
-  security:
-    iam:
-      forbidden_actions:
-        - "*:*"
-        - "iam:*"
-        - "sts:AssumeRole"
-      require_mfa: true
-    
-    lambda:
-      require_vpc: true
-      max_timeout: 900
-      allowed_runtimes:
-        - "python3.11"
-        - "python3.12"
-        - "nodejs18.x"
-        - "nodejs20.x"
-    
-    agent:
-      require_guardrails: true
-      require_encryption: true
-      max_session_ttl: 3600
-```
-
-### Using Enterprise Validation
-
-#### Command Line Usage
-```bash
-# Use enterprise validation profile
-bedrock-forge validate . --profile enterprise
-
-# Use custom validation configuration
-bedrock-forge validate . --profile custom --config ./enterprise-validation.yml
-
-# Generate with enterprise validation
-bedrock-forge generate . ./terraform --profile enterprise
-```
-
-#### CI/CD Integration
-```yaml
-# .github/workflows/ci.yml
-name: Enterprise Validation
-on: [push, pull_request]
-
-jobs:
-  validate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Validate Bedrock Configurations
-        uses: ./.github/workflows/bedrock-forge-deploy.yml
-        with:
-          validation_only: true
-          validation_profile: enterprise
-          source_path: '.'
-```
-
-### Enterprise Tagging Examples
-
-#### Development Environment
-```yaml
-tags:
-  Environment: "dev"
-  Project: "customer-support-ai"
-  Owner: "john.doe@company.com"
-  CostCenter: "CC-123456"
-  Team: "ai-platform"
-  BusinessUnit: "engineering"
-  DataClassification: "internal"
-  ComplianceLevel: "standard"
-```
-
-#### Production Environment
-```yaml
-tags:
-  Environment: "prod"
-  Project: "customer-support-ai"
-  Owner: "ai-team@company.com"
-  CostCenter: "CC-789012"
-  Team: "ai-platform"
-  BusinessUnit: "engineering"
-  DataClassification: "confidential"
-  ComplianceLevel: "pci-dss"
-  BackupRequired: "true"
-  MonitoringLevel: "high"
-```
-
-### Security Best Practices
-
-#### Agent Security Requirements
-```yaml
-# Enterprise agent with security controls
+  contentPolicyConfig:
+    filtersConfig:
+      - type: SEXUAL
+        inputStrength: HIGH
+        outputStrength: HIGH
+      - type: VIOLENCE
+        inputStrength: HIGH
+        outputStrength: HIGH
+  sensitiveInformationPolicyConfig:
+    piiEntitiesConfig:
+      - type: EMAIL
+        action: ANONYMIZE
+      - type: PHONE
+        action: BLOCK
+
+# agent.yml  
 kind: Agent
 metadata:
-  name: "secure-customer-agent"
+  name: enterprise-agent
 spec:
   foundationModel: "anthropic.claude-3-sonnet-20240229-v1:0"
-  instruction: "You are a secure customer support agent..."
-  
-  # Required: Guardrail for content safety
+  instruction: "You are an enterprise customer service agent..."
   guardrail:
-    name: "enterprise-content-guardrail"
-    version: "2"
-    mode: "pre"
-  
-  # Required: Customer encryption key
-  customerEncryptionKey: "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
-  
-  # Required: Session timeout limits
-  idleSessionTtlInSeconds: 1800  # 30 minutes max
-  
-  # Required: Memory configuration
-  memoryConfiguration:
-    enabledMemoryTypes: ["SESSION_SUMMARY"]
-    storageDays: 7  # Limited retention
+    name: enterprise-safety
+  tags:
+    Environment: production
+    Team: customer-service
+    Compliance: required
 ```
 
-#### Lambda Security Requirements
+## Dependency Management and Cross-References
+
+**Resource Creation Order:**
+1. IAMRole → CustomResources → Guardrail → Prompt → Lambda
+2. OpenSearchServerless → KnowledgeBase → ActionGroup → Agent
+
+**Cross-Reference Patterns:**
+- Lambda functions: Reference by name in ActionGroups
+- Guardrails: Reference by name in Agents
+- Prompts: Reference by name in Agent promptOverrides
+- Custom resources: Use Terraform syntax `${resource.name.output}`
+- Agent references: Use module outputs `${module.agent_name.agent_id}`
+
+**Dependencies:**
 ```yaml
-# Enterprise Lambda with security controls
-kind: Lambda
-metadata:
-  name: "secure-order-processor"
 spec:
-  runtime: "python3.11"  # Approved runtime
-  handler: "app.handler"
-  timeout: 300  # Under enterprise limit
-  
-  # Required: VPC configuration
-  vpcConfig:
-    securityGroupIds: ["sg-12345678"]
-    subnetIds: ["subnet-12345678", "subnet-87654321"]
-  
-  # Required: Environment encryption
-  kmsKeyArn: "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
-  
-  # Required: Dead letter queue
-  deadLetterConfig:
-    targetArn: "arn:aws:sqs:us-east-1:123456789012:dlq-queue"
+  dependsOn:
+    - lambda-function-name  # Lambda resource
+    - infrastructure        # CustomResources
+    - safety-guardrail     # Guardrail resource
 ```
 
-### Validation Error Examples
+## Best Practices
 
-#### Naming Convention Violations
-```
-ERROR: Agent name 'CustomerSupport' violates naming convention
-Expected pattern: ^[a-z][a-z0-9-]*-agent$
-Suggestion: customer-support-agent
-```
+### 1. Resource Organization
+- Use descriptive names that indicate purpose
+- Group related resources in the same file
+- Use consistent naming conventions across environments
 
-#### Missing Required Tags
-```
-ERROR: Missing required tags on resource 'customer-agent'
-Missing tags: Owner, CostCenter, ComplianceLevel
-Required for enterprise deployment
-```
+### 2. Security
+- Let bedrock-forge auto-generate IAM roles (includes all necessary permissions)
+- Use guardrails for content safety in production
+- Enable KMS encryption for sensitive prompts
 
-#### Security Policy Violations
-```
-ERROR: Lambda function timeout exceeds enterprise limit
-Current: 900 seconds, Maximum allowed: 600 seconds
-Update timeout or request security exception
-```
+### 3. Infrastructure Integration
+- Use CustomResources for AWS resources not directly supported
+- Store supporting infrastructure (.tf files) in organized directories
+- Cross-reference custom resources in agent environment variables
 
-### Multi-Environment Validation
+### 4. CI/CD
+- Use validation workflow for all pull requests
+- Require manual approval for production deployments
+- Store Terraform artifacts in S3 for auditability
 
-#### Development
-- **Relaxed Naming**: Flexible patterns for rapid iteration
-- **Optional Tags**: Basic tagging requirements
-- **Minimal Security**: Basic security controls
+### 5. Development Workflow
+- Start with basic agents and iteratively add complexity
+- Use inline action groups for simpler deployments
+- Test locally with `bedrock-forge validate` and `bedrock-forge generate`
 
-#### Staging
-- **Stricter Naming**: Production-like naming patterns
-- **Required Tags**: Full tagging compliance
-- **Enhanced Security**: Production security controls
-
-#### Production
-- **Strict Naming**: Full enterprise naming compliance
-- **Mandatory Tags**: Complete cost allocation and compliance tags
-- **Maximum Security**: All security controls required, encryption mandatory
-
----
-
-This guide provides AI assistants with essential context about Bedrock Forge's capabilities, YAML schema patterns, CLI usage, and enterprise features to effectively help developers work with the platform.
+This comprehensive reference covers all bedrock-forge capabilities based on the actual implementation, providing accurate field specifications, validation rules, and real-world usage patterns for rapid AWS Bedrock development.
