@@ -131,7 +131,7 @@ func (v *TaggingValidator) ValidateResourceTags(resource interface{}, context *V
 		metadata = r.Metadata
 		resourceType = "Lambda"
 	case *models.ActionGroup:
-		tags = make(map[string]string) // ActionGroup doesn't have tags in spec
+		tags = r.Spec.Tags
 		metadata = r.Metadata
 		resourceType = "ActionGroup"
 	case *models.KnowledgeBase:
@@ -150,6 +150,10 @@ func (v *TaggingValidator) ValidateResourceTags(resource interface{}, context *V
 		tags = r.Spec.Tags
 		metadata = r.Metadata
 		resourceType = "IAMRole"
+	case *models.OpenSearchServerless:
+		tags = r.Spec.Tags
+		metadata = r.Metadata
+		resourceType = "OpenSearchServerless"
 	default:
 		// Skip unknown resource types
 		return errors
@@ -366,8 +370,8 @@ func (v *TaggingValidator) getTagValidationMessage(rule *TagValidationRule, defa
 func DefaultTaggingPolicies() *TaggingPolicyConfig {
 	return &TaggingPolicyConfig{
 		Global: &TaggingRequirements{
-			RequiredTags: []string{"Environment", "Project", "Owner"},
-			OptionalTags: []string{"CostCenter", "Team", "Contact"},
+			RequiredTags: []string{"Environment", "Project"},
+			OptionalTags: []string{"Owner", "CostCenter", "Team", "Contact"},
 		},
 		Resources: map[string]*TaggingRequirements{
 			"Agent": {
@@ -383,20 +387,7 @@ func DefaultTaggingPolicies() *TaggingPolicyConfig {
 				OptionalTags: []string{"DataClassification", "RefreshSchedule"},
 			},
 		},
-		TagValidation: map[string]*TagValidationRule{
-			"Environment": {
-				AllowedValues: []string{"dev", "staging", "prod", "test"},
-				CaseSensitive: false,
-			},
-			"Owner": {
-				Pattern:           `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`,
-				ValidationMessage: "Owner must be a valid email address",
-			},
-			"CostCenter": {
-				Pattern:           `^CC-\d{4}$`,
-				ValidationMessage: "CostCenter must follow format: CC-XXXX (e.g., CC-1234)",
-			},
-		},
+		TagValidation: map[string]*TagValidationRule{},
 	}
 }
 
@@ -407,14 +398,13 @@ func EnterpriseTaggingPolicies() *TaggingPolicyConfig {
 			RequiredTags: []string{
 				"Environment",
 				"Project",
-				"Owner",
 				"CostCenter",
 				"Team",
 				"BusinessUnit",
 				"DataClassification",
 				"ComplianceLevel",
 			},
-			OptionalTags: []string{"BackupRequired", "MonitoringLevel", "SLA"},
+			OptionalTags: []string{"Owner", "BackupRequired", "MonitoringLevel", "SLA"},
 		},
 		Resources: map[string]*TaggingRequirements{
 			"Agent": {
@@ -450,38 +440,6 @@ func EnterpriseTaggingPolicies() *TaggingPolicyConfig {
 				},
 			},
 		},
-		TagValidation: map[string]*TagValidationRule{
-			"Environment": {
-				AllowedValues: []string{"dev", "staging", "prod"},
-				CaseSensitive: false,
-			},
-			"Owner": {
-				Pattern:           `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`,
-				ValidationMessage: "Owner must be a valid corporate email address",
-			},
-			"CostCenter": {
-				Pattern:           `^CC-\d{6}$`,
-				ValidationMessage: "CostCenter must follow corporate format: CC-XXXXXX",
-			},
-			"Team": {
-				AllowedValues: []string{
-					"engineering", "data", "security", "operations",
-					"product", "compliance", "finance", "legal",
-				},
-				CaseSensitive: false,
-			},
-			"DataClassification": {
-				AllowedValues: []string{"public", "internal", "confidential", "restricted"},
-				CaseSensitive: false,
-			},
-			"ComplianceLevel": {
-				AllowedValues: []string{"none", "pci", "hipaa", "sox", "gdpr"},
-				CaseSensitive: false,
-			},
-			"SecurityLevel": {
-				AllowedValues: []string{"low", "medium", "high", "critical"},
-				CaseSensitive: false,
-			},
-		},
+		TagValidation: map[string]*TagValidationRule{},
 	}
 }

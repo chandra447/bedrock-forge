@@ -155,12 +155,15 @@ func (g *HCLGenerator) generateKnowledgeBaseModule(body *hclwrite.Body, resource
 				s3Values := make(map[string]cty.Value)
 				s3Values["bucket_arn"] = cty.StringVal(dataSource.S3Configuration.BucketArn)
 
+				// Always include both prefix types for consistency
 				if len(dataSource.S3Configuration.InclusionPrefixes) > 0 {
 					prefixes := make([]cty.Value, 0, len(dataSource.S3Configuration.InclusionPrefixes))
 					for _, prefix := range dataSource.S3Configuration.InclusionPrefixes {
 						prefixes = append(prefixes, cty.StringVal(prefix))
 					}
 					s3Values["inclusion_prefixes"] = cty.ListVal(prefixes)
+				} else {
+					s3Values["inclusion_prefixes"] = cty.NullVal(cty.List(cty.String))
 				}
 
 				if len(dataSource.S3Configuration.ExclusionPrefixes) > 0 {
@@ -169,9 +172,18 @@ func (g *HCLGenerator) generateKnowledgeBaseModule(body *hclwrite.Body, resource
 						prefixes = append(prefixes, cty.StringVal(prefix))
 					}
 					s3Values["exclusion_prefixes"] = cty.ListVal(prefixes)
+				} else {
+					s3Values["exclusion_prefixes"] = cty.NullVal(cty.List(cty.String))
 				}
 
 				dsValues["s3_configuration"] = cty.ObjectVal(s3Values)
+			} else {
+				// Ensure s3_configuration is always present for consistency
+				dsValues["s3_configuration"] = cty.NullVal(cty.Object(map[string]cty.Type{
+					"bucket_arn":         cty.String,
+					"inclusion_prefixes": cty.List(cty.String),
+					"exclusion_prefixes": cty.List(cty.String),
+				}))
 			}
 
 			// Chunking configuration
@@ -179,12 +191,18 @@ func (g *HCLGenerator) generateKnowledgeBaseModule(body *hclwrite.Body, resource
 				chunkingValues := make(map[string]cty.Value)
 				chunkingValues["chunking_strategy"] = cty.StringVal(dataSource.ChunkingConfiguration.ChunkingStrategy)
 
+				// Always include both chunking configuration types for consistency
 				if dataSource.ChunkingConfiguration.FixedSizeChunkingConfiguration != nil {
 					fixedSizeConfig := dataSource.ChunkingConfiguration.FixedSizeChunkingConfiguration
 					chunkingValues["fixed_size_chunking_configuration"] = cty.ObjectVal(map[string]cty.Value{
 						"max_tokens":         cty.NumberIntVal(int64(fixedSizeConfig.MaxTokens)),
 						"overlap_percentage": cty.NumberIntVal(int64(fixedSizeConfig.OverlapPercentage)),
 					})
+				} else {
+					chunkingValues["fixed_size_chunking_configuration"] = cty.NullVal(cty.Object(map[string]cty.Type{
+						"max_tokens":         cty.Number,
+						"overlap_percentage": cty.Number,
+					}))
 				}
 
 				if dataSource.ChunkingConfiguration.SemanticChunkingConfiguration != nil {
@@ -194,9 +212,29 @@ func (g *HCLGenerator) generateKnowledgeBaseModule(body *hclwrite.Body, resource
 						"buffer_size":                     cty.NumberIntVal(int64(semanticConfig.BufferSize)),
 						"breakpoint_percentile_threshold": cty.NumberIntVal(int64(semanticConfig.BreakpointPercentileThreshold)),
 					})
+				} else {
+					chunkingValues["semantic_chunking_configuration"] = cty.NullVal(cty.Object(map[string]cty.Type{
+						"max_tokens":                      cty.Number,
+						"buffer_size":                     cty.Number,
+						"breakpoint_percentile_threshold": cty.Number,
+					}))
 				}
 
 				dsValues["chunking_configuration"] = cty.ObjectVal(chunkingValues)
+			} else {
+				// Ensure chunking_configuration is always present for consistency
+				dsValues["chunking_configuration"] = cty.NullVal(cty.Object(map[string]cty.Type{
+					"chunking_strategy":                   cty.String,
+					"fixed_size_chunking_configuration":  cty.Object(map[string]cty.Type{
+						"max_tokens":         cty.Number,
+						"overlap_percentage": cty.Number,
+					}),
+					"semantic_chunking_configuration": cty.Object(map[string]cty.Type{
+						"max_tokens":                      cty.Number,
+						"buffer_size":                     cty.Number,
+						"breakpoint_percentile_threshold": cty.Number,
+					}),
+				}))
 			}
 
 			// Vector ingestion configuration
@@ -214,10 +252,28 @@ func (g *HCLGenerator) generateKnowledgeBaseModule(body *hclwrite.Body, resource
 						"buffer_size":                     cty.NumberIntVal(int64(semanticConfig.BufferSize)),
 						"breakpoint_percentile_threshold": cty.NumberIntVal(int64(semanticConfig.BreakpointPercentileThreshold)),
 					})
+				} else {
+					chunkingValues["semantic_chunking_configuration"] = cty.NullVal(cty.Object(map[string]cty.Type{
+						"max_tokens":                      cty.Number,
+						"buffer_size":                     cty.Number,
+						"breakpoint_percentile_threshold": cty.Number,
+					}))
 				}
 
 				vectorIngestionValues["chunking_configuration"] = cty.ObjectVal(chunkingValues)
 				dsValues["vector_ingestion_configuration"] = cty.ObjectVal(vectorIngestionValues)
+			} else {
+				// Ensure vector_ingestion_configuration is always present for consistency
+				dsValues["vector_ingestion_configuration"] = cty.NullVal(cty.Object(map[string]cty.Type{
+					"chunking_configuration": cty.Object(map[string]cty.Type{
+						"chunking_strategy": cty.String,
+						"semantic_chunking_configuration": cty.Object(map[string]cty.Type{
+							"max_tokens":                      cty.Number,
+							"buffer_size":                     cty.Number,
+							"breakpoint_percentile_threshold": cty.Number,
+						}),
+					}),
+				}))
 			}
 
 			// Custom transformation
@@ -228,6 +284,10 @@ func (g *HCLGenerator) generateKnowledgeBaseModule(body *hclwrite.Body, resource
 					lambdaValues := make(map[string]cty.Value)
 					lambdaValues["lambda_arn"] = cty.StringVal(dataSource.CustomTransformation.TransformationLambda.LambdaArn)
 					customTransValues["transformation_lambda"] = cty.ObjectVal(lambdaValues)
+				} else {
+					customTransValues["transformation_lambda"] = cty.NullVal(cty.Object(map[string]cty.Type{
+						"lambda_arn": cty.String,
+					}))
 				}
 
 				if dataSource.CustomTransformation.IntermediateStorage != nil {
@@ -236,11 +296,33 @@ func (g *HCLGenerator) generateKnowledgeBaseModule(body *hclwrite.Body, resource
 						s3Values := make(map[string]cty.Value)
 						s3Values["uri"] = cty.StringVal(dataSource.CustomTransformation.IntermediateStorage.S3Location.URI)
 						storageValues["s3_location"] = cty.ObjectVal(s3Values)
+					} else {
+						storageValues["s3_location"] = cty.NullVal(cty.Object(map[string]cty.Type{
+							"uri": cty.String,
+						}))
 					}
 					customTransValues["intermediate_storage"] = cty.ObjectVal(storageValues)
+				} else {
+					customTransValues["intermediate_storage"] = cty.NullVal(cty.Object(map[string]cty.Type{
+						"s3_location": cty.Object(map[string]cty.Type{
+							"uri": cty.String,
+						}),
+					}))
 				}
 
 				dsValues["custom_transformation"] = cty.ObjectVal(customTransValues)
+			} else {
+				// Ensure custom_transformation is always present for consistency
+				dsValues["custom_transformation"] = cty.NullVal(cty.Object(map[string]cty.Type{
+					"transformation_lambda": cty.Object(map[string]cty.Type{
+						"lambda_arn": cty.String,
+					}),
+					"intermediate_storage": cty.Object(map[string]cty.Type{
+						"s3_location": cty.Object(map[string]cty.Type{
+							"uri": cty.String,
+						}),
+					}),
+				}))
 			}
 
 			dataSourceList = append(dataSourceList, cty.ObjectVal(dsValues))
