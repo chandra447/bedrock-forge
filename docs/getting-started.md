@@ -12,6 +12,103 @@ Before starting, ensure you have:
 - **Git repository** for your project
 - **AWS account** with Bedrock access enabled
 
+### Required AWS Permissions
+
+For **local development** and **manual deployment**, your AWS credentials need:
+
+**Core Bedrock Permissions:**
+- `bedrock:*` - Full Bedrock access for agents, models, and knowledge bases
+- `iam:CreateRole`, `iam:AttachRolePolicy`, `iam:PassRole` - For auto-generated IAM roles
+- `lambda:*` - For Lambda function management
+- `s3:*` - For S3 bucket management and file uploads
+- `opensearch:*` - For OpenSearch Serverless collections (if using knowledge bases)
+
+**Terraform State Management:**
+- `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject` - For state file storage
+- `dynamodb:GetItem`, `dynamodb:PutItem`, `dynamodb:DeleteItem` - For state locking (optional)
+
+### CI/CD IAM Role Requirements
+
+For **GitHub Actions CI/CD**, you need two IAM roles:
+
+**1. Validation Role** (`AWS_VALIDATION_ROLE`)
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:GetFoundationModel",
+        "bedrock:ListFoundationModels",
+        "iam:GetRole",
+        "iam:ListRoles",
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:ListBucket"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": "arn:aws:s3:::your-terraform-artifacts-bucket/*"
+    }
+  ]
+}
+```
+
+**2. Deployment Role** (`AWS_DEPLOYMENT_ROLE`)
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "*",
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+### S3 Buckets for State and Artifacts
+
+You need two S3 buckets:
+
+**1. Terraform State Bucket** (`TERRAFORM_STATE_BUCKET`)
+```bash
+aws s3 mb s3://your-terraform-state-bucket
+aws s3api put-bucket-versioning --bucket your-terraform-state-bucket --versioning-configuration Status=Enabled
+aws s3api put-bucket-encryption --bucket your-terraform-state-bucket --server-side-encryption-configuration '{
+  "Rules": [{
+    "ApplyServerSideEncryptionByDefault": {
+      "SSEAlgorithm": "AES256"
+    }
+  }]
+}'
+```
+
+**2. Terraform Artifacts Bucket** (`TERRAFORM_ARTIFACTS_BUCKET`)
+```bash
+aws s3 mb s3://your-terraform-artifacts-bucket
+```
+
+### DynamoDB State Locking Table (Optional)
+
+For enhanced state management:
+```bash
+aws dynamodb create-table \
+  --table-name terraform-state-lock \
+  --attribute-definitions AttributeName=LockID,AttributeType=S \
+  --key-schema AttributeName=LockID,KeyType=HASH \
+  --billing-mode PAY_PER_REQUEST
+```
+
 ## Step 1: Installation
 
 ### Clone and Build
@@ -459,24 +556,48 @@ aws bedrock-agent-runtime invoke-agent \
 
 ## Step 6: Set Up CI/CD (Optional)
 
-For production deployments, set up GitHub Actions:
+Bedrock Forge provides automated CI/CD with **intelligent Terraform file management**:
 
-### Copy Workflow
+### **Main Branch Behavior:**
+- ✅ Generated Terraform files are pushed to a **dedicated branch** (default: `terraform-generated`)
+- ✅ Ready for immediate deployment from the repository
+- ✅ No S3 dependencies for deployment
 
-```bash
-mkdir -p .github/workflows
-cp .github/workflows/bedrock-forge-deploy.yml .github/workflows/
-```
+### **Feature Branch Behavior:**
+- ✅ Generated Terraform files are stored in **S3 bucket** with commit hash
+- ✅ Validated before merging to main
+- ✅ Prevents repository clutter
 
 ### Configure Repository Secrets
 
-In your GitHub repository settings, add:
+In your GitHub repository settings, add these **secrets**:
 
-- `AWS_ROLE_ARN`: Your AWS deployment role ARN
-- `TF_STATE_BUCKET`: S3 bucket for Terraform state
-- `TF_STATE_LOCK_TABLE`: DynamoDB table for state locking
+- `AWS_VALIDATION_ROLE`: IAM role ARN for validation (read-only)
+- `AWS_DEPLOYMENT_ROLE`: IAM role ARN for deployment (full access)
+- `TERRAFORM_ARTIFACTS_BUCKET`: S3 bucket for storing generated Terraform files
+- `TERRAFORM_STATE_BUCKET`: S3 bucket for Terraform state storage
 
-### Create Workflow
+### Create Validation Workflow
+
+Create `.github/workflows/validate.yml`:
+
+```yaml
+name: Validate Bedrock Configuration
+
+on:
+  pull_request:
+    branches: [main]
+    paths: ['**/*.yml', '**/*.yaml']
+
+jobs:
+  validate:
+    uses: your-org/bedrock-forge/.github/workflows/bedrock-forge-validate.yml@main
+    with:
+      terraform_branch: terraform-generated  # Custom branch name
+    secrets: inherit
+```
+
+### Create Deployment Workflow
 
 Create `.github/workflows/deploy.yml`:
 
@@ -486,20 +607,142 @@ name: Deploy Bedrock Agents
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
+    paths: ['**/*.yml', '**/*.yaml']
 
 jobs:
   deploy:
     uses: your-org/bedrock-forge/.github/workflows/bedrock-forge-deploy.yml@main
     with:
-      environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
+      environment: production
       aws_region: us-east-1
-      aws_role: ${{ vars.AWS_DEPLOYMENT_ROLE }}
-      tf_state_bucket: ${{ vars.TF_STATE_BUCKET }}
-      validation_only: ${{ github.event_name == 'pull_request' }}
+      aws_role: ${{ secrets.AWS_DEPLOYMENT_ROLE }}
+      tf_state_bucket: ${{ secrets.TERRAFORM_STATE_BUCKET }}
+      terraform_branch: terraform-generated  # Custom branch name
     secrets: inherit
 ```
+
+### Manual Deployment Workflow
+
+Create `.github/workflows/manual-deploy.yml`:
+
+```yaml
+name: Manual Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      terraform_branch:
+        description: 'Terraform branch to deploy from'
+        required: false
+        default: 'terraform-generated'
+        type: string
+      dry_run:
+        description: 'Run in dry-run mode (plan only)'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  deploy:
+    uses: your-org/bedrock-forge/.github/workflows/bedrock-forge-deploy.yml@main
+    with:
+      environment: ${{ inputs.environment }}
+      aws_role: ${{ secrets.AWS_DEPLOYMENT_ROLE }}
+      tf_state_bucket: ${{ secrets.TERRAFORM_STATE_BUCKET }}
+      terraform_branch: ${{ inputs.terraform_branch }}
+      dry_run: ${{ inputs.dry_run }}
+    secrets: inherit
+```
+
+### How It Works
+
+**1. Feature Branch Development:**
+```bash
+# Create feature branch
+git checkout -b feature/new-agent
+
+# Make changes to YAML files
+vim agents/my-agent.yml
+
+# Push changes
+git push origin feature/new-agent
+# → Triggers validation workflow
+# → Terraform files stored in S3: s3://bucket/generated-modules/abc123def456/
+```
+
+**2. Main Branch Deployment:**
+```bash
+# Merge to main
+git checkout main
+git merge feature/new-agent
+git push origin main
+# → Triggers deployment workflow
+# → Terraform files pushed to: terraform-generated branch
+# → Ready for deployment
+```
+
+**3. Deploy from Terraform Branch:**
+```bash
+# Switch to terraform branch
+git checkout terraform-generated
+
+# Deploy manually
+terraform init
+terraform plan -var="environment=prod"
+terraform apply -var="environment=prod"
+```
+
+### Repository Structure
+
+After CI/CD setup, your repository will have:
+
+```
+my-bedrock-project/
+├── .github/workflows/
+│   ├── validate.yml
+│   ├── deploy.yml
+│   └── manual-deploy.yml
+├── agents/
+│   └── my-agent.yml
+├── lambdas/
+│   └── my-lambda.yml
+└── terraform-generated/           # Auto-generated branch
+    ├── main.tf
+    ├── variables.tf
+    ├── outputs.tf
+    └── DEPLOYMENT_INFO.md
+```
+
+### Benefits
+
+**🔒 Security:**
+- Separate IAM roles for validation vs deployment
+- Validation role has minimal permissions
+- Deployment role has full access only when needed
+
+**📁 Organization:**
+- Feature branches: Terraform files in S3 (temporary)
+- Main branch: Terraform files in dedicated branch (permanent)
+- No repository clutter with generated files
+
+**🚀 Deployment:**
+- Terraform files always ready in repository
+- No S3 dependencies for deployment
+- Clear audit trail of generated configurations
+
+**⚡ Speed:**
+- Pre-validated Terraform configurations
+- No regeneration needed for deployment
+- Immediate deployment from repository branch
 
 ## Next Steps
 
