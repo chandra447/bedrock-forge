@@ -9,6 +9,7 @@ Bedrock Forge is an enterprise platform that transforms YAML configurations into
 - Comprehensive dependency management and resource ordering
 - Automatic IAM role generation with appropriate permissions
 - Cross-resource references and validation
+- Automatic output directory creation (`outputs_tf`) for generated files
 
 **CI/CD Integration:**
 - Separate validation and deployment GitHub Actions workflows
@@ -21,6 +22,7 @@ Bedrock Forge is an enterprise platform that transforms YAML configurations into
 - Automated Lambda code packaging and deployment
 - OpenAPI schema management for Action Groups
 - Enterprise governance and tagging enforcement
+- Enhanced tag validation with proper null handling
 
 ## Reference Syntax
 
@@ -41,6 +43,50 @@ guardrail:
 ```
 
 Both syntaxes are functionally equivalent. The object syntax provides better IDE support and validation, while the string syntax offers more concise YAML. Choose the style that best fits your team's preferences.
+
+## CLI Commands
+
+### Generate Command
+
+```bash
+bedrock-forge generate [path] [output-dir]
+```
+
+**Arguments:**
+- `path`: Path to directory containing YAML files (default: current directory)
+- `output-dir`: Output directory for generated Terraform files (default: `outputs_tf`)
+
+**Examples:**
+```bash
+# Generate from current directory to outputs_tf
+bedrock-forge generate
+
+# Generate from specific directory
+bedrock-forge generate examples/
+
+# Generate with custom output directory
+bedrock-forge generate examples/ my-terraform/
+```
+
+**Features:**
+- Automatically creates the output directory if it doesn't exist
+- Generates `main.tf` with all resources and proper dependencies
+- Copies CustomResources .tf files to the output directory
+- Creates variables files for CustomResources with provided variables
+- Validates all cross-references before generation
+
+### Other Commands
+
+```bash
+# Scan and list all resources
+bedrock-forge scan [path]
+
+# Validate YAML syntax and dependencies
+bedrock-forge validate [path]
+
+# Show version information
+bedrock-forge version
+```
 
 ## Supported Resources
 
@@ -525,7 +571,7 @@ metadata:
   description: string (optional)
 spec:
   # Directory containing .tf files OR specific files (mutually exclusive)
-  path: string (optional) # e.g., "./terraform/"
+  path: string (optional) # e.g., "./terraform/" or "../infrastructure/"
   files: []string (optional) # e.g., ["sns.tf", "eventbridge.tf"]
   
   # Variables to pass to your Terraform configuration
@@ -569,9 +615,13 @@ spec:
 
 **Key Features:**
 - Include any AWS resource using standard Terraform syntax
+- Supports both directory paths and specific file lists
+- Automatic path resolution from source directory
+- Variable support with automatic merging and type conversion
 - Cross-reference resources in agent configurations
-- Variable support with automatic merging
-- Single unified deployment with all resources
+- Generated variables.tf files for each CustomResource
+- Proper dependency ordering with other resources
+- Files are copied to the output directory for unified deployment
 
 ## GitHub Actions CI/CD Workflows
 
@@ -906,6 +956,7 @@ spec:
 **Resource Creation Order:**
 1. IAMRole → CustomResources → Guardrail → Prompt → Lambda
 2. OpenSearchServerless → KnowledgeBase → ActionGroup → Agent
+3. AgentKnowledgeBaseAssociation (after both Agent and KnowledgeBase)
 
 **Cross-Reference Patterns:**
 - Lambda functions: `{ref: lambda-name}` or `"lambda-name"` in ActionGroups
@@ -913,6 +964,7 @@ spec:
 - Prompts: `{ref: prompt-name}` or `"prompt-name"` in Agent promptOverrides
 - Custom resources: Use Terraform syntax `${resource.name.output}`
 - Agent references: `{ref: agent-name}` or `"agent-name"` for cross-references
+- Knowledge base references: `{ref: kb-name}` or `"kb-name"` in associations
 
 **Dependencies:**
 ```yaml
@@ -922,6 +974,30 @@ spec:
     - {ref: infrastructure}        # CustomResources reference
     - "safety-guardrail"           # Guardrail resource (string syntax)
 ```
+
+## Recent Improvements
+
+### Enhanced CustomResources Support
+- **Fixed "invalid custom resources spec format" error**: Resolved issue where CustomResources couldn't be properly parsed due to missing registry conversion
+- **Improved path handling**: CustomResources now properly resolves relative paths from the source directory
+- **Automatic output directory creation**: The CLI now creates the output directory automatically
+- **Better error messages**: More descriptive error messages for missing files and directories
+
+### CLI Improvements
+- **New default output directory**: Changed from `./terraform` to `outputs_tf` for better user experience
+- **Enhanced help text**: Added detailed argument descriptions and examples
+- **Zero-setup generation**: Users can immediately inspect generated .tf files without manual setup
+- **Improved file copying**: CustomResources files are now copied with proper source directory context
+
+### Tag Validation Fixes
+- **Fixed knowledge base chunking configuration**: Resolved inconsistent list element types causing panics
+- **Improved null handling**: Better handling of optional fields in chunking configurations
+- **Enhanced S3 configuration**: Fixed missing inclusion/exclusion prefixes causing validation errors
+- **Consistent field structure**: All optional fields now properly default to null for consistent HCL generation
+
+### Deprecated Features Removed
+- **CustomModule support removed**: Simplified codebase by removing deprecated CustomModule functionality
+- **Focus on CustomResources**: All custom Terraform integration now uses the more flexible CustomResources approach
 
 ## Best Practices
 
