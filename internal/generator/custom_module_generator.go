@@ -55,7 +55,6 @@ func (g *HCLGenerator) generateCustomResourcesModule(body *hclwrite.Body, resour
 	return nil
 }
 
-
 // convertToCtyValue converts Go interface{} values to cty.Value
 func convertToCtyValue(value interface{}) (cty.Value, error) {
 	switch v := value.(type) {
@@ -95,7 +94,6 @@ func convertToCtyValue(value interface{}) (cty.Value, error) {
 	}
 }
 
-
 // copyUserTerraformFiles copies user's .tf files to the output directory
 func (g *HCLGenerator) copyUserTerraformFiles(spec models.CustomResourcesSpec) error {
 	if spec.Path != "" {
@@ -120,7 +118,7 @@ func (g *HCLGenerator) copyTerraformPath(path string) error {
 	} else {
 		srcPath = filepath.Join(g.config.SourceDir, path)
 	}
-	
+
 	// Check if path exists
 	if _, err := os.Stat(srcPath); os.IsNotExist(err) {
 		return fmt.Errorf("path does not exist: %s", srcPath)

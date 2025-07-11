@@ -224,8 +224,8 @@ func (g *HCLGenerator) generateKnowledgeBaseModule(body *hclwrite.Body, resource
 			} else {
 				// Ensure chunking_configuration is always present for consistency
 				dsValues["chunking_configuration"] = cty.NullVal(cty.Object(map[string]cty.Type{
-					"chunking_strategy":                   cty.String,
-					"fixed_size_chunking_configuration":  cty.Object(map[string]cty.Type{
+					"chunking_strategy": cty.String,
+					"fixed_size_chunking_configuration": cty.Object(map[string]cty.Type{
 						"max_tokens":         cty.Number,
 						"overlap_percentage": cty.Number,
 					}),

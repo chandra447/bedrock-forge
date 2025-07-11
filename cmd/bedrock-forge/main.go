@@ -55,7 +55,7 @@ var validateCmd = &cobra.Command{
 var generateCmd = &cobra.Command{
 	Use:   "generate [path] [output-dir]",
 	Short: "Generate Terraform configuration from YAML resources",
-	Long:  `Generate Terraform configuration files from discovered YAML resources.
+	Long: `Generate Terraform configuration files from discovered YAML resources.
 
 Arguments:
   path        Path to directory containing YAML files (default: current directory)

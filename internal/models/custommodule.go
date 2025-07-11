@@ -24,4 +24,3 @@ type CustomResourcesSpec struct {
 	// Variables to pass to the Terraform configuration
 	Variables map[string]interface{} `yaml:"variables,omitempty"`
 }
-

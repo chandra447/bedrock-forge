@@ -153,7 +153,6 @@ func (p *YAMLParser) parseDocument(content []byte, filePath string, docIndex int
 		}
 		parsedResource.Resource = &customResources
 
-
 	case models.OpenSearchServerlessKind:
 		var opensearchServerless models.OpenSearchServerless
 		if err := yaml.Unmarshal(content, &opensearchServerless); err != nil {
@@ -367,7 +366,6 @@ func (p *YAMLParser) validateCustomResources(customResources *models.CustomResou
 
 	return nil
 }
-
 
 func (p *YAMLParser) validateOpenSearchServerless(opensearchServerless *models.OpenSearchServerless) error {
 	if opensearchServerless.Spec.CollectionName == "" {

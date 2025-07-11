@@ -194,7 +194,6 @@ func (r *ResourceRegistry) ValidateDependencies() []error {
 		}
 	}
 
-
 	return errors
 }
 
@@ -257,19 +256,19 @@ func (r *ResourceRegistry) GetResourcesByType(kind models.ResourceKind) []models
 				if iamRole, ok := resource.Resource.(*models.IAMRole); ok {
 					spec = iamRole.Spec
 				}
-		case models.OpenSearchServerlessKind:
-			if opensearchServerless, ok := resource.Resource.(*models.OpenSearchServerless); ok {
-				spec = opensearchServerless.Spec
+			case models.OpenSearchServerlessKind:
+				if opensearchServerless, ok := resource.Resource.(*models.OpenSearchServerless); ok {
+					spec = opensearchServerless.Spec
+				}
+			case models.CustomResourcesKind:
+				if customResources, ok := resource.Resource.(*models.CustomResources); ok {
+					spec = customResources.Spec
+				}
+			case models.AgentKnowledgeBaseAssociationKind:
+				if association, ok := resource.Resource.(*models.AgentKnowledgeBaseAssociation); ok {
+					spec = association.Spec
+				}
 			}
-		case models.CustomResourcesKind:
-			if customResources, ok := resource.Resource.(*models.CustomResources); ok {
-				spec = customResources.Spec
-			}
-		case models.AgentKnowledgeBaseAssociationKind:
-			if association, ok := resource.Resource.(*models.AgentKnowledgeBaseAssociation); ok {
-				spec = association.Spec
-			}
-		}
 
 			result = append(result, models.BaseResource{
 				Kind:     resource.Kind,
