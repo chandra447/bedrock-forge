@@ -55,84 +55,6 @@ func (g *HCLGenerator) generateCustomResourcesModule(body *hclwrite.Body, resour
 	return nil
 }
 
-// generateCustomModuleModule creates a module call for a CustomModule resource (Deprecated)
-func (g *HCLGenerator) generateCustomModuleModule(body *hclwrite.Body, resource models.BaseResource) error {
-	customModule, ok := resource.Spec.(models.CustomModuleSpec)
-	if !ok {
-		// Try to parse as map and convert to CustomModuleSpec
-		specMap, mapOk := resource.Spec.(map[string]interface{})
-		if !mapOk {
-			return fmt.Errorf("invalid custom module spec format")
-		}
-
-		// Convert map to CustomModuleSpec
-		specJSON, err := json.Marshal(specMap)
-		if err != nil {
-			return fmt.Errorf("failed to marshal custom module spec: %w", err)
-		}
-
-		if err := json.Unmarshal(specJSON, &customModule); err != nil {
-			return fmt.Errorf("failed to unmarshal custom module spec: %w", err)
-		}
-	}
-
-	resourceName := g.sanitizeResourceName(resource.Metadata.Name)
-
-	g.logger.WithField("custom_module", resource.Metadata.Name).Debug("Generating custom module")
-
-	// Create module block
-	moduleBlock := body.AppendNewBlock("module", []string{resourceName})
-	moduleBody := moduleBlock.Body()
-
-	// Set module source
-	moduleSource := customModule.Source
-	if customModule.Version != "" {
-		// Add version reference for git or registry modules
-		if isGitSource(customModule.Source) {
-			moduleSource += fmt.Sprintf("?ref=%s", customModule.Version)
-		} else if isRegistrySource(customModule.Source) {
-			// For registry modules, version is handled differently
-			moduleBody.SetAttributeValue("version", cty.StringVal(customModule.Version))
-		}
-	}
-	moduleBody.SetAttributeValue("source", cty.StringVal(moduleSource))
-
-	// Set input variables
-	if len(customModule.Variables) > 0 {
-		for varName, varValue := range customModule.Variables {
-			ctyValue, err := convertToCtyValue(varValue)
-			if err != nil {
-				g.logger.WithField("variable", varName).WithError(err).Warn("Failed to convert variable value")
-				continue
-			}
-			moduleBody.SetAttributeValue(varName, ctyValue)
-		}
-	}
-
-	// Add dependency references if specified
-	if len(customModule.DependsOn) > 0 {
-		dependsList := make([]cty.Value, 0, len(customModule.DependsOn))
-		for _, depRef := range customModule.DependsOn {
-			if !depRef.IsEmpty() {
-				// Check if dependency exists in registry and create proper reference
-				if g.isValidDependency(depRef.String()) {
-					depName := g.sanitizeResourceName(depRef.String())
-					dependsList = append(dependsList, cty.StringVal(fmt.Sprintf("module.%s", depName)))
-				} else {
-					g.logger.WithField("dependency", depRef.String()).Warn("Invalid dependency reference in custom module")
-				}
-			}
-		}
-		if len(dependsList) > 0 {
-			moduleBody.SetAttributeValue("depends_on", cty.ListVal(dependsList))
-		}
-	}
-
-	body.AppendNewline()
-
-	g.logger.WithField("custom_module", resource.Metadata.Name).Info("Generated custom module")
-	return nil
-}
 
 // convertToCtyValue converts Go interface{} values to cty.Value
 func convertToCtyValue(value interface{}) (cty.Value, error) {
@@ -173,46 +95,6 @@ func convertToCtyValue(value interface{}) (cty.Value, error) {
 	}
 }
 
-// isGitSource checks if the source is a git repository
-func isGitSource(source string) bool {
-	return len(source) > 4 && (source[:4] == "git:" ||
-		source[:8] == "https://" && (source[8:] == "github.com" || source[8:] == "gitlab.com"))
-}
-
-// isRegistrySource checks if the source is a Terraform registry module
-func isRegistrySource(source string) bool {
-	// Registry modules typically have format: namespace/name/provider
-	parts := len(source)
-	slashCount := 0
-	for i := 0; i < parts; i++ {
-		if source[i] == '/' {
-			slashCount++
-		}
-	}
-	return slashCount == 2 && !isGitSource(source) && source[0] != '.' && source[0] != '/'
-}
-
-// isValidDependency checks if a dependency reference is valid
-func (g *HCLGenerator) isValidDependency(dep string) bool {
-	// Check if dependency exists in any of the supported resource types
-	resourceTypes := []models.ResourceKind{
-		models.AgentKind,
-		models.LambdaKind,
-		models.ActionGroupKind,
-		models.KnowledgeBaseKind,
-		models.GuardrailKind,
-		models.PromptKind,
-		models.IAMRoleKind,
-		models.CustomModuleKind,
-	}
-
-	for _, resourceType := range resourceTypes {
-		if g.registry.HasResource(resourceType, dep) {
-			return true
-		}
-	}
-	return false
-}
 
 // copyUserTerraformFiles copies user's .tf files to the output directory
 func (g *HCLGenerator) copyUserTerraformFiles(spec models.CustomResourcesSpec) error {
@@ -231,26 +113,34 @@ func (g *HCLGenerator) copyUserTerraformFiles(spec models.CustomResourcesSpec) e
 
 // copyTerraformPath copies all .tf files from a directory or a single .tf file
 func (g *HCLGenerator) copyTerraformPath(path string) error {
+	// Convert relative path to absolute path using source directory
+	var srcPath string
+	if filepath.IsAbs(path) {
+		srcPath = path
+	} else {
+		srcPath = filepath.Join(g.config.SourceDir, path)
+	}
+	
 	// Check if path exists
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return fmt.Errorf("path does not exist: %s", path)
+	if _, err := os.Stat(srcPath); os.IsNotExist(err) {
+		return fmt.Errorf("path does not exist: %s", srcPath)
 	}
 
 	// Check if it's a file or directory
-	fileInfo, err := os.Stat(path)
+	fileInfo, err := os.Stat(srcPath)
 	if err != nil {
-		return fmt.Errorf("failed to stat path %s: %w", path, err)
+		return fmt.Errorf("failed to stat path %s: %w", srcPath, err)
 	}
 
 	if fileInfo.IsDir() {
 		// Copy all .tf files from directory
-		return g.copyTerraformFromDirectory(path)
+		return g.copyTerraformFromDirectory(srcPath)
 	} else {
 		// Copy single file
-		if !strings.HasSuffix(path, ".tf") {
-			return fmt.Errorf("file must have .tf extension: %s", path)
+		if !strings.HasSuffix(srcPath, ".tf") {
+			return fmt.Errorf("file must have .tf extension: %s", srcPath)
 		}
-		return g.copyTerraformFile(path)
+		return g.copyTerraformFile(srcPath)
 	}
 }
 
@@ -260,7 +150,14 @@ func (g *HCLGenerator) copyTerraformFiles(files []string) error {
 		if !strings.HasSuffix(file, ".tf") {
 			return fmt.Errorf("file must have .tf extension: %s", file)
 		}
-		if err := g.copyTerraformFile(file); err != nil {
+		// Convert relative path to absolute path using source directory
+		var srcPath string
+		if filepath.IsAbs(file) {
+			srcPath = file
+		} else {
+			srcPath = filepath.Join(g.config.SourceDir, file)
+		}
+		if err := g.copyTerraformFile(srcPath); err != nil {
 			return fmt.Errorf("failed to copy file %s: %w", file, err)
 		}
 	}

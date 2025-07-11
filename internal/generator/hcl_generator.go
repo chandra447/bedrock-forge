@@ -30,6 +30,7 @@ type GeneratorConfig struct {
 	ModuleRegistry string
 	ModuleVersion  string
 	OutputDir      string
+	SourceDir      string
 	ProjectName    string
 	Environment    string
 }
@@ -52,6 +53,11 @@ func (g *HCLGenerator) SetGenerationContext(context *GenerationContext) {
 // Generate creates Terraform configuration from the resource registry
 func (g *HCLGenerator) Generate() error {
 	g.logger.Info("Starting HCL generation...")
+
+	// Ensure output directory exists
+	if err := os.MkdirAll(g.config.OutputDir, 0755); err != nil {
+		return fmt.Errorf("failed to create output directory %s: %w", g.config.OutputDir, err)
+	}
 
 	// Build dependency graph
 	dependencyOrder, err := g.buildDependencyOrder()
@@ -120,7 +126,6 @@ func (g *HCLGenerator) buildDependencyGraph() map[models.ResourceKind][]models.R
 	allKinds := []models.ResourceKind{
 		models.IAMRoleKind,
 		models.CustomResourcesKind,
-		models.CustomModuleKind,
 		models.GuardrailKind,
 		models.PromptKind,
 		models.LambdaKind,
@@ -231,18 +236,6 @@ func (g *HCLGenerator) extractResourceDependencies(resource models.BaseResource)
 			}
 		}
 
-	case models.CustomModuleKind:
-		// Custom module depends on its dependencies
-		if customModule, ok := resource.Spec.(models.CustomModuleSpec); ok {
-			for _, depRef := range customModule.DependsOn {
-				if !depRef.IsEmpty() {
-					// Determine the kind of the dependency
-					if depKind := g.getResourceKindByName(depRef.String()); depKind != "" {
-						dependencies = append(dependencies, depKind)
-					}
-				}
-			}
-		}
 	}
 
 	return dependencies
@@ -253,7 +246,6 @@ func (g *HCLGenerator) getResourceKindByName(resourceName string) models.Resourc
 	allKinds := []models.ResourceKind{
 		models.IAMRoleKind,
 		models.CustomResourcesKind,
-		models.CustomModuleKind,
 		models.GuardrailKind,
 		models.PromptKind,
 		models.LambdaKind,
@@ -351,8 +343,6 @@ func (g *HCLGenerator) generateModuleCall(body *hclwrite.Body, resource models.B
 		return g.generateIAMRoleModule(body, resource)
 	case models.CustomResourcesKind:
 		return g.generateCustomResourcesModule(body, resource)
-	case models.CustomModuleKind:
-		return g.generateCustomModuleModule(body, resource)
 	case models.OpenSearchServerlessKind:
 		return g.generateOpenSearchServerlessModule(body, resource)
 	case models.AgentKnowledgeBaseAssociationKind:

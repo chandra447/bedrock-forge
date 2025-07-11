@@ -17,7 +17,6 @@ const (
 	IAMRoleKind                       ResourceKind = "IAMRole"
 	AgentKnowledgeBaseAssociationKind ResourceKind = "AgentKnowledgeBaseAssociation"
 	CustomResourcesKind               ResourceKind = "CustomResources"
-	CustomModuleKind                  ResourceKind = "CustomModule" // Deprecated: Use CustomResourcesKind
 	OpenSearchServerlessKind          ResourceKind = "OpenSearchServerless"
 )
 

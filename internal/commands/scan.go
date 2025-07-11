@@ -109,7 +109,7 @@ func (s *ScanCommand) printScanResults() {
 		models.GuardrailKind,
 		models.PromptKind,
 		models.IAMRoleKind,
-		models.CustomModuleKind,
+		models.CustomResourcesKind,
 	}
 
 	for _, kind := range resourceKinds {

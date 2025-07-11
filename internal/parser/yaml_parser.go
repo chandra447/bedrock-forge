@@ -153,12 +153,6 @@ func (p *YAMLParser) parseDocument(content []byte, filePath string, docIndex int
 		}
 		parsedResource.Resource = &customResources
 
-	case models.CustomModuleKind:
-		var customModule models.CustomModule
-		if err := yaml.Unmarshal(content, &customModule); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal CustomModule: %w", err)
-		}
-		parsedResource.Resource = &customModule
 
 	case models.OpenSearchServerlessKind:
 		var opensearchServerless models.OpenSearchServerless
@@ -207,8 +201,6 @@ func (p *YAMLParser) ValidateResource(resource *ParsedResource) error {
 		return p.validateIAMRole(resource.Resource.(*models.IAMRole))
 	case models.CustomResourcesKind:
 		return p.validateCustomResources(resource.Resource.(*models.CustomResources))
-	case models.CustomModuleKind:
-		return p.validateCustomModule(resource.Resource.(*models.CustomModule))
 	case models.OpenSearchServerlessKind:
 		return p.validateOpenSearchServerless(resource.Resource.(*models.OpenSearchServerless))
 	case models.AgentKnowledgeBaseAssociationKind:
@@ -376,12 +368,6 @@ func (p *YAMLParser) validateCustomResources(customResources *models.CustomResou
 	return nil
 }
 
-func (p *YAMLParser) validateCustomModule(customModule *models.CustomModule) error {
-	if customModule.Spec.Source == "" {
-		return fmt.Errorf("custom module source is required")
-	}
-	return nil
-}
 
 func (p *YAMLParser) validateOpenSearchServerless(opensearchServerless *models.OpenSearchServerless) error {
 	if opensearchServerless.Spec.CollectionName == "" {
