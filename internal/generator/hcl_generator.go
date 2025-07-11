@@ -478,25 +478,6 @@ func (g *HCLGenerator) writeFile(path string, content []byte) error {
 	return os.WriteFile(path, content, 0644)
 }
 
-// resolveReference resolves a Reference to a resource name and module reference
-func (g *HCLGenerator) resolveReference(ref models.Reference, expectedKind models.ResourceKind) (string, string, error) {
-	if ref.IsEmpty() {
-		return "", "", fmt.Errorf("empty reference")
-	}
-
-	resourceName := ref.String()
-
-	// Check if the resource exists in the registry
-	if !g.registry.HasResource(expectedKind, resourceName) {
-		return "", "", fmt.Errorf("resource %s of kind %s not found in registry", resourceName, expectedKind)
-	}
-
-	// Return the resource name and module reference
-	sanitizedName := g.sanitizeResourceName(resourceName)
-	moduleRef := fmt.Sprintf("${module.%s}", sanitizedName)
-
-	return resourceName, moduleRef, nil
-}
 
 // resolveReferenceToOutput resolves a Reference to a specific module output
 func (g *HCLGenerator) resolveReferenceToOutput(ref models.Reference, expectedKind models.ResourceKind, outputName string) (string, error) {
