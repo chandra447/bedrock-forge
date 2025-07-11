@@ -1,0 +1,40 @@
+apiVersion: bedrock-forge.dev/v1alpha1
+kind: Lambda
+metadata:
+  name: text-processor-lambda
+  description: "Lambda function for processing text documents"
+spec:
+  runtime: python3.11
+  handler: text_processor.lambda_handler
+  
+  code:
+    source: "./lambda-functions/text-processor/"
+    
+  environment:
+    LOG_LEVEL: "INFO"
+    S3_BUCKET: "${aws_s3_bucket.document_storage_bucket.bucket}"  # Reference to actual S3 bucket
+    
+  timeout: 60
+  memorySize: 512
+  
+  # Use auto-generated IAM role for now
+  # iamRole:
+  #   existing: {ref: lambda-s3-access-role}  # Reference to IAMRole
+  
+  # Enhanced attributes
+  architectures:
+    - "x86_64"
+    
+  tracingConfig:
+    mode: "Active"
+    
+  publish: true
+  
+  tags:
+    Function: "text-processing"
+    Environment: "production"
+    Project: "document-processing"
+    Owner: "team@company.com"
+    Runtime: "python3.11"
+    FunctionType: "text-processing"
+    Purpose: "document-processing"

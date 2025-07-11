@@ -1,0 +1,96 @@
+apiVersion: bedrock-forge.dev/v1alpha1
+kind: Agent
+metadata:
+  name: document-assistant-agent
+  description: "AI assistant for document processing and summarization"
+spec:
+  foundationModel: "anthropic.claude-3-sonnet-20240229-v1:0"
+  
+  # Let bedrock-forge auto-generate the agent execution role
+  # The agent needs permissions to invoke lambda functions
+  
+  instruction: |
+    You are a document processing assistant. You can:
+    1. Process text documents from S3 buckets
+    2. Generate summaries of processed documents
+    3. Answer questions about document content
+    
+    When users ask you to process documents, use the appropriate tools based on their needs.
+    
+  actionGroups:
+    - name: "text-processing-actions"
+      description: "Actions for processing text documents"
+      actionGroupExecutor:
+        lambda: {ref: text-processor-lambda}
+      functionSchema:
+        functions:
+          - name: "process_text"
+            description: "Process text document from S3 bucket"
+            parameters:
+              s3_bucket:
+                description: "S3 bucket containing the document"
+                required: true
+                type: "string"
+              s3_key:
+                description: "S3 key of the document"
+                required: true
+                type: "string"
+              processing_type:
+                description: "Type of processing to perform (extract, analyze, clean)"
+                required: true
+                type: "string"
+              text:
+                description: "Text content (not used for this function)"
+                required: false
+                type: "string"
+              summary_type:
+                description: "Summary type (not used for this function)"
+                required: false
+                type: "string"
+              max_length:
+                description: "Maximum length (not used for this function)"
+                required: false
+                type: "string"
+          
+    - name: "summary-generation-actions"
+      description: "Actions for generating document summaries"
+      actionGroupExecutor:
+        lambda: {ref: summary-generator-lambda}
+      functionSchema:
+        functions:
+          - name: "generate_summary"
+            description: "Generate document summary from text"
+            parameters:
+              text:
+                description: "Text to summarize"
+                required: true
+                type: "string"
+              summary_type:
+                description: "Type of summary to generate (brief, detailed, bullet_points)"
+                required: true
+                type: "string"
+              max_length:
+                description: "Maximum length of summary"
+                required: false
+                type: "string"
+              s3_bucket:
+                description: "S3 bucket (not used for this function)"
+                required: false
+                type: "string"
+              s3_key:
+                description: "S3 key (not used for this function)"
+                required: false
+                type: "string"
+              processing_type:
+                description: "Processing type (not used for this function)"
+                required: false
+                type: "string"
+          
+  tags:
+    Application: "document-processing"
+    Environment: "production"
+    Project: "document-processing"
+    Owner: "team@company.com"
+    AgentType: "document-assistant"
+    BusinessFunction: "document-processing"
+    Purpose: "document-processing"

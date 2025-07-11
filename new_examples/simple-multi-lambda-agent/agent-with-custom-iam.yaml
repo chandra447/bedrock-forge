@@ -1,0 +1,65 @@
+apiVersion: bedrock-forge.dev/v1alpha1
+kind: Agent
+metadata:
+  name: document-assistant-agent-custom-iam
+  description: "AI assistant for document processing with custom IAM role"
+spec:
+  foundationModel: "anthropic.claude-3-sonnet-20240229-v1:0"
+  
+  # Example 1: Use existing IAM role ARN
+  iamRole:
+    roleArn: "arn:aws:iam::123456789012:role/ExistingBedrockAgentRole"
+  
+  # Example 2: Reference to manually defined IAMRole resource
+  # iamRole:
+  #   roleName: {ref: custom-agent-execution-role}
+  
+  # Example 3: Explicitly disable auto-creation (will cause error if no existing role)
+  # iamRole:
+  #   autoCreate: false
+  
+  # Example 4: Auto-create with additional policies
+  # iamRole:
+  #   autoCreate: true
+  #   additionalPolicies:
+  #     - policyArn: "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
+  
+  instruction: |
+    You are a document processing assistant. You can:
+    1. Process text documents from S3 buckets
+    2. Generate summaries of processed documents
+    3. Answer questions about document content
+    
+    When users ask you to process documents, use the appropriate tools based on their needs.
+    
+  actionGroups:
+    - name: "text-processing-actions"
+      description: "Actions for processing text documents"
+      actionGroupExecutor:
+        lambda: {ref: text-processor-lambda}
+      functionSchema:
+        functions:
+          - name: "process_text"
+            description: "Process text document from S3 bucket"
+            parameters:
+              s3_bucket:
+                description: "S3 bucket containing the document"
+                required: true
+                type: "string"
+              s3_key:
+                description: "S3 key of the document"
+                required: true
+                type: "string"
+              processing_type:
+                description: "Type of processing to perform (extract, analyze, clean)"
+                required: true
+                type: "string"
+          
+  tags:
+    Application: "document-processing"
+    Environment: "production"
+    Project: "document-processing"
+    Owner: "team@company.com"
+    AgentType: "document-assistant"
+    BusinessFunction: "document-processing"
+    Purpose: "document-processing"
