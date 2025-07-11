@@ -271,9 +271,10 @@ func (r *ResourceRegistry) GetResourcesByType(kind models.ResourceKind) []models
 			}
 
 			result = append(result, models.BaseResource{
-				Kind:     resource.Kind,
-				Metadata: resource.Metadata,
-				Spec:     spec,
+				Kind:           resource.Kind,
+				Metadata:       resource.Metadata,
+				Spec:           spec,
+				SourceFilePath: resource.FilePath,
 			})
 		}
 	}
