@@ -155,14 +155,56 @@ spec:
     - name: string (required)
       description: string (optional)
       tags: map[string]string (optional)
+  
+  # IAM Role configuration (allows users to specify existing roles or customize auto-generated ones)
+  iamRole: (optional)
+    autoCreate: bool (optional) # Default: true
+    roleArn: string (optional) # For existing role ARN
+    roleName: {ref: role-name} | "role-name" (optional) # Reference to IAMRole resource
+    additionalPolicies: (optional)
+      - policyArn: string (required)
+        policyName: {ref: policy-name} | "policy-name" (optional)
 ```
 
 **Key Features:**
-- Automatic IAM execution role generation with comprehensive Bedrock permissions
+- **Flexible IAM role management**: Auto-generate roles (default) or use existing IAM roles
+- **Refined Lambda permissions**: Uses specific Lambda ARNs instead of wildcards for better security
 - Inline action groups with Lambda integration (no separate ActionGroup resources needed)
 - Guardrail and prompt integration via references
 - Agent aliases for environment-specific deployments
 - Cross-resource dependency management
+
+**IAM Role Configuration:**
+```yaml
+# Option 1: Auto-generate IAM role (default behavior)
+spec:
+  foundationModel: "anthropic.claude-3-sonnet-20240229-v1:0"
+  instruction: "You are a helpful assistant"
+  # No iamRole specified - auto-generates with appropriate permissions
+
+# Option 2: Use existing IAM role ARN
+spec:
+  iamRole:
+    roleArn: "arn:aws:iam::123456789012:role/ExistingBedrockAgentRole"
+
+# Option 3: Reference custom IAMRole resource
+spec:
+  iamRole:
+    roleName: {ref: custom-agent-execution-role}
+
+# Option 4: Auto-create with additional policies
+spec:
+  iamRole:
+    autoCreate: true
+    additionalPolicies:
+      - policyArn: "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
+
+# Option 5: Explicitly disable auto-creation (requires existing role)
+spec:
+  iamRole:
+    autoCreate: false
+    roleArn: "arn:aws:iam::123456789012:role/ExistingBedrockAgentRole"
+```
 
 ### 2. Lambda - AWS Lambda Functions for Action Groups
 
@@ -202,11 +244,24 @@ spec:
 ```
 
 **Key Features:**
-- Automatic IAM execution role generation
+- **Automatic IAM execution role generation** with refined permissions
+- **Smart S3 permissions**: Automatically adds S3 policies when environment variables reference S3 buckets
 - Code packaging and S3 deployment
 - Zero-configuration resource policies (auto-detects agent references)
 - Agent-specific permissions with source ARN restrictions
 - VPC integration support
+
+**Automatic Permission Detection:**
+```yaml
+# Lambda with S3 bucket reference in environment variables
+spec:
+  environment:
+    S3_BUCKET: "${aws_s3_bucket.document_storage_bucket.bucket}"
+    LOG_LEVEL: "INFO"
+# bedrock-forge automatically detects S3 reference and adds appropriate IAM policies:
+# - s3:GetObject, s3:PutObject, s3:DeleteObject on bucket contents
+# - s3:ListBucket, s3:GetBucketLocation on bucket itself
+```
 
 ### 3. ActionGroup - Standalone Action Groups (Alternative to Inline)
 
@@ -537,6 +592,131 @@ spec:
 
 **Note:** IAM roles are automatically generated for agents and Lambda functions. Use custom IAMRole resources only for specific enterprise requirements.
 
+## IAM Security and Best Practices
+
+### Auto-Generated IAM Roles
+
+Bedrock Forge automatically generates IAM roles with **least-privilege permissions** for maximum security:
+
+**Agent Execution Roles:**
+- **Bedrock permissions**: `bedrock:InvokeModel`, `bedrock:InvokeModelWithResponseStream`
+- **Inference Profile permissions**: `bedrock:GetInferenceProfile`, `bedrock:ListInferenceProfiles`, `bedrock:UseInferenceProfile`  
+- **Specific Lambda permissions**: Uses actual Lambda function ARNs instead of wildcards (e.g., `aws_lambda_function.text_processor.arn`)
+- **Knowledge Base permissions**: `bedrock:Retrieve`, `bedrock:RetrieveAndGenerate` (when knowledge bases are used)
+- **CloudWatch Logs permissions**: `logs:CreateLogGroup`, `logs:CreateLogStream`, `logs:PutLogEvents`
+
+**Lambda Execution Roles:**
+- **Basic execution permissions**: `AWSLambdaBasicExecutionRole` managed policy
+- **Smart S3 permissions**: Automatically added when environment variables reference S3 resources
+- **VPC permissions**: `AWSLambdaVPCAccessExecutionRole` when VPC configuration is specified
+
+### Security Improvements
+
+**Refined Lambda Permissions (New):**
+```hcl
+# BEFORE: Used wildcards (less secure)
+"Resource": "arn:aws:lambda:*:*:function:*"
+
+# AFTER: Uses specific Lambda ARNs (more secure)
+"Resource": [
+  "${aws_lambda_function.text_processor_lambda.arn}",
+  "${aws_lambda_function.summary_generator_lambda.arn}"
+]
+```
+
+**Smart S3 Permission Detection (New):**
+```yaml
+# When Lambda environment variables reference S3 buckets:
+environment:
+  S3_BUCKET: "${aws_s3_bucket.document_storage_bucket.bucket}"
+
+# bedrock-forge automatically adds these permissions:
+# Object-level permissions:
+# - s3:GetObject, s3:PutObject, s3:DeleteObject on arn:aws:s3:::*/*
+# Bucket-level permissions:  
+# - s3:ListBucket, s3:GetBucketLocation on arn:aws:s3:::*
+```
+
+### IAM Role Customization Options
+
+**1. Enterprise IAM Role Management:**
+```yaml
+# Use existing enterprise IAM role
+kind: Agent
+spec:
+  iamRole:
+    roleArn: "arn:aws:iam::123456789012:role/BedrockAgentExecutionRole"
+```
+
+**2. Cross-Account Access:**
+```yaml
+# Reference IAM role from another account
+kind: Agent
+spec:
+  iamRole:
+    roleArn: "arn:aws:iam::987654321098:role/CrossAccountBedrockRole"
+```
+
+**3. Custom IAM Role Resource:**
+```yaml
+# Define custom IAM role with specific permissions
+kind: IAMRole
+metadata:
+  name: custom-agent-execution-role
+spec:
+  assumeRolePolicy:
+    version: "2012-10-17"
+    statement:
+      - effect: Allow
+        principal:
+          Service: bedrock.amazonaws.com
+        action: sts:AssumeRole
+  policies:
+    - policyArn: "arn:aws:iam::aws:policy/AmazonBedrockFullAccess"
+  inlinePolicies:
+    - name: CustomLambdaPermissions
+      policy:
+        version: "2012-10-17"
+        statement:
+          - effect: Allow
+            action: lambda:InvokeFunction
+            resource: 
+              - "arn:aws:lambda:us-east-1:123456789012:function:specific-function"
+
+# Reference the custom role
+kind: Agent
+spec:
+  iamRole:
+    roleName: {ref: custom-agent-execution-role}
+```
+
+**4. Additional Policies for Auto-Generated Roles:**
+```yaml
+# Add extra policies to auto-generated roles
+kind: Agent
+spec:
+  iamRole:
+    autoCreate: true
+    additionalPolicies:
+      - policyArn: "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
+      - policyArn: "arn:aws:iam::aws:policy/AmazonDynamoDBReadOnlyAccess"
+```
+
+### When to Use Custom IAM Roles
+
+**Use Auto-Generated Roles When:**
+- Building new applications with standard permissions
+- Want zero-configuration security setup
+- Need least-privilege access automatically applied
+- Using standard Bedrock + Lambda + S3 architecture
+
+**Use Custom IAM Roles When:**
+- Enterprise compliance requires specific IAM role patterns
+- Cross-account access is needed
+- Integration with existing IAM infrastructure
+- Custom permissions beyond standard Bedrock + Lambda + S3
+- Centralized IAM role management is required
+
 ### 10. AgentKnowledgeBaseAssociation - Link Agents to Knowledge Bases
 
 ```yaml
@@ -746,7 +926,243 @@ spec:
     lambda: "helper-function"      # String syntax
 ```
 
-### 2. Basic Agent with Lambda Action Group
+### 2. Complete Multi-Lambda Agent with S3 Integration
+
+```yaml
+# s3-infrastructure.yml
+kind: CustomResources
+metadata:
+  name: document-storage-bucket
+spec:
+  files: ["s3.tf"]
+  variables:
+    bucket_name: "document-processing-storage"
+    environment: "production"
+
+# lambda-text-processor.yml
+kind: Lambda
+metadata:
+  name: text-processor-lambda
+  description: "Lambda function for processing text documents"
+spec:
+  runtime: python3.11
+  handler: text_processor.lambda_handler
+  code:
+    source: "./lambda-functions/text-processor/"
+  environment:
+    LOG_LEVEL: "INFO"
+    S3_BUCKET: "${aws_s3_bucket.document_storage_bucket.bucket}"
+    # bedrock-forge automatically detects S3 reference and adds IAM permissions
+  timeout: 60
+  memorySize: 512
+  architectures: ["x86_64"]
+  tracingConfig:
+    mode: "Active"
+  publish: true
+  tags:
+    Function: "text-processing"
+    Environment: "production"
+
+# lambda-summary-generator.yml  
+kind: Lambda
+metadata:
+  name: summary-generator-lambda
+  description: "Lambda function for generating summaries from processed text"
+spec:
+  runtime: python3.11
+  handler: summary_generator.lambda_handler
+  code:
+    source: "./lambda-functions/summary-generator/"
+  environment:
+    LOG_LEVEL: "INFO"
+    S3_BUCKET: "${aws_s3_bucket.document_storage_bucket.bucket}"
+    # bedrock-forge automatically detects S3 reference and adds IAM permissions
+  timeout: 30
+  memorySize: 256
+  architectures: ["arm64"]
+  tracingConfig:
+    mode: "Active"
+  publish: true
+  tags:
+    Function: "summary-generation"
+    Environment: "production"
+
+# agent-document-assistant.yml
+kind: Agent
+metadata:
+  name: document-assistant-agent
+  description: "AI assistant for document processing and summarization"
+spec:
+  foundationModel: "anthropic.claude-3-sonnet-20240229-v1:0"
+  
+  # Uses auto-generated IAM role with refined Lambda permissions
+  # (no iamRole specified = auto-generate with specific Lambda ARNs)
+  
+  instruction: |
+    You are a document processing assistant. You can:
+    1. Process text documents from S3 buckets
+    2. Generate summaries of processed documents
+    3. Answer questions about document content
+    
+    When users ask you to process documents, use the appropriate tools based on their needs.
+    
+  actionGroups:
+    - name: "text-processing-actions"
+      description: "Actions for processing text documents"
+      actionGroupExecutor:
+        lambda: {ref: text-processor-lambda}
+      functionSchema:
+        functions:
+          - name: "process_text"
+            description: "Process text document from S3 bucket"
+            parameters:
+              s3_bucket:
+                description: "S3 bucket containing the document"
+                required: true
+                type: "string"
+              s3_key:
+                description: "S3 key of the document"
+                required: true
+                type: "string"
+              processing_type:
+                description: "Type of processing to perform (extract, analyze, clean)"
+                required: true
+                type: "string"
+          
+    - name: "summary-generation-actions"
+      description: "Actions for generating document summaries"
+      actionGroupExecutor:
+        lambda: {ref: summary-generator-lambda}
+      functionSchema:
+        functions:
+          - name: "generate_summary"
+            description: "Generate document summary from text"
+            parameters:
+              text:
+                description: "Text to summarize"
+                required: true
+                type: "string"
+              summary_type:
+                description: "Type of summary to generate (brief, detailed, bullet_points)"
+                required: true
+                type: "string"
+              max_length:
+                description: "Maximum length of summary"
+                required: false
+                type: "string"
+          
+  tags:
+    Application: "document-processing"
+    Environment: "production"
+    Project: "document-processing"
+    Owner: "team@company.com"
+    AgentType: "document-assistant"
+```
+
+**Generated IAM Permissions (Auto-Generated):**
+```hcl
+# Agent execution role with refined Lambda permissions
+resource "aws_iam_role_policy" "document_assistant_agent_execution_role_inline_policy" {
+  policy = jsonencode({
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = ["lambda:InvokeFunction"]
+        Resource = [
+          # Uses specific Lambda ARNs instead of wildcards
+          aws_lambda_function.text_processor_lambda.arn,
+          aws_lambda_function.summary_generator_lambda.arn
+        ]
+      }
+    ]
+  })
+}
+
+# Lambda execution roles with automatic S3 permissions
+resource "aws_iam_role_policy" "text_processor_lambda_execution_role_s3_policy" {
+  policy = jsonencode({
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
+        Resource = "arn:aws:s3:::*/*"
+      },
+      {
+        Effect = "Allow"
+        Action = ["s3:ListBucket", "s3:GetBucketLocation"]
+        Resource = "arn:aws:s3:::*"
+      }
+    ]
+  })
+}
+```
+
+### 3. Agent with Custom IAM Role
+
+```yaml
+# custom-iam-role.yml
+kind: IAMRole
+metadata:
+  name: enterprise-agent-execution-role
+spec:
+  assumeRolePolicy:
+    version: "2012-10-17"
+    statement:
+      - effect: Allow
+        principal:
+          Service: bedrock.amazonaws.com
+        action: sts:AssumeRole
+  policies:
+    - policyArn: "arn:aws:iam::aws:policy/AmazonBedrockFullAccess"
+  inlinePolicies:
+    - name: CustomLambdaPermissions
+      policy:
+        version: "2012-10-17"
+        statement:
+          - effect: Allow
+            action: lambda:InvokeFunction
+            resource: 
+              - "arn:aws:lambda:us-east-1:123456789012:function:approved-function-1"
+              - "arn:aws:lambda:us-east-1:123456789012:function:approved-function-2"
+
+# agent-with-custom-iam.yml
+kind: Agent
+metadata:
+  name: enterprise-agent
+spec:
+  foundationModel: "anthropic.claude-3-sonnet-20240229-v1:0"
+  instruction: "You are an enterprise assistant with custom IAM permissions"
+  
+  # Option 1: Reference custom IAM role resource
+  iamRole:
+    roleName: {ref: enterprise-agent-execution-role}
+  
+  # Option 2: Use existing IAM role ARN
+  # iamRole:
+  #   roleArn: "arn:aws:iam::123456789012:role/ExistingEnterpriseRole"
+  
+  # Option 3: Auto-generate with additional policies
+  # iamRole:
+  #   autoCreate: true
+  #   additionalPolicies:
+  #     - policyArn: "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
+  
+  actionGroups:
+    - name: enterprise-tools
+      actionGroupExecutor:
+        lambda: {ref: enterprise-lambda}
+      functionSchema:
+        functions:
+          - name: enterprise_action
+            description: "Enterprise-specific action"
+            parameters:
+              action_type:
+                description: "Type of enterprise action"
+                required: true
+                type: string
+```
+
+### 4. Basic Agent with Lambda Action Group
 
 ```yaml
 # lambda.yml
@@ -781,7 +1197,7 @@ spec:
                 type: string
 ```
 
-### 3. Knowledge Base with Agent Association
+### 5. Knowledge Base with Agent Association
 
 ```yaml
 # opensearch.yml
@@ -840,7 +1256,7 @@ spec:
   state: "ENABLED"
 ```
 
-### 4. Knowledge Base with Custom Infrastructure
+### 6. Knowledge Base with Custom Infrastructure
 
 ```yaml
 # infrastructure.yml
@@ -879,7 +1295,7 @@ spec:
     - {ref: vector-infrastructure}
 ```
 
-### 5. Prompt with Tool Calling
+### 7. Prompt with Tool Calling
 
 ```yaml
 kind: Prompt
@@ -913,7 +1329,7 @@ spec:
               auto: {}
 ```
 
-### 6. Enterprise Agent with Guardrails
+### 8. Enterprise Agent with Guardrails
 
 ```yaml
 # guardrail.yml
@@ -976,6 +1392,37 @@ spec:
 ```
 
 ## Recent Improvements
+
+### Enhanced IAM Security and Customization
+
+**Refined Lambda Permissions:**
+- **Security Enhancement**: Agent execution roles now use specific Lambda function ARNs instead of wildcards
+- **Improved**: `"Resource": "arn:aws:lambda:*:*:function:*"` → `"Resource": ["${aws_lambda_function.text_processor.arn}"]`
+- **Benefit**: Follows principle of least privilege, reducing attack surface
+
+**Flexible IAM Role Management:**
+- **New Feature**: Users can now opt out of auto-generated IAM roles
+- **Options Added**: Use existing IAM role ARNs, reference custom IAMRole resources, or extend auto-generated roles
+- **Enterprise Support**: Cross-account access, compliance-specific role patterns, centralized IAM management
+- **Backward Compatible**: Existing configurations continue to work without changes
+
+**Smart S3 Permission Detection:**
+- **Auto-Detection**: Automatically adds S3 permissions when Lambda environment variables reference S3 buckets
+- **Comprehensive**: Includes both object-level (`s3:GetObject`, `s3:PutObject`, `s3:DeleteObject`) and bucket-level (`s3:ListBucket`, `s3:GetBucketLocation`) permissions
+- **Zero-Configuration**: No manual IAM policy management required for S3 integration
+
+### Advanced Lambda Integration
+
+**Enhanced Lambda Configuration:**
+- **Tracing Support**: Full AWS X-Ray tracing configuration with block syntax
+- **Architecture Options**: Support for both x86_64 and ARM64 architectures
+- **Publishing**: Automatic Lambda versioning with `publish: true`
+- **Smart Permissions**: Automatic detection of required permissions based on configuration
+
+**Improved Resource Generation:**
+- **Native Resources**: Uses native AWS Terraform resources instead of external modules
+- **Proper Syntax**: Fixed block vs object syntax issues (e.g., `tracing_config { }` instead of `tracing_config = { }`)
+- **Better References**: Proper Terraform resource references without double-escaping
 
 ### Enhanced CustomResources Support
 - **Fixed "invalid custom resources spec format" error**: Resolved issue where CustomResources couldn't be properly parsed due to missing registry conversion
