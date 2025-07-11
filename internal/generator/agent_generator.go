@@ -10,7 +10,7 @@ import (
 	"bedrock-forge/internal/models"
 )
 
-// generateAgentModule creates a module call for an Agent resource
+// generateAgentModule creates a native AWS Terraform resource for an Agent
 func (g *HCLGenerator) generateAgentModule(body *hclwrite.Body, resource models.BaseResource) error {
 	agent, ok := resource.Spec.(models.AgentSpec)
 	if !ok {
@@ -33,37 +33,30 @@ func (g *HCLGenerator) generateAgentModule(body *hclwrite.Body, resource models.
 
 	resourceName := g.sanitizeResourceName(resource.Metadata.Name)
 
-	// Create module block
-	moduleBlock := body.AppendNewBlock("module", []string{resourceName})
-	moduleBody := moduleBlock.Body()
+	// Create native AWS resource block
+	resourceBlock := body.AppendNewBlock("resource", []string{"aws_bedrockagent_agent", resourceName})
+	resourceBody := resourceBlock.Body()
 
-	// Set module source
-	moduleSource := fmt.Sprintf("%s//modules/bedrock-agent", g.config.ModuleRegistry)
-	if g.config.ModuleVersion != "" {
-		moduleSource += fmt.Sprintf("?ref=%s", g.config.ModuleVersion)
-	}
-	moduleBody.SetAttributeValue("source", cty.StringVal(moduleSource))
+	// Set basic attributes according to AWS provider schema
+	resourceBody.SetAttributeValue("agent_name", cty.StringVal(resource.Metadata.Name))
+	resourceBody.SetAttributeValue("foundation_model", cty.StringVal(agent.FoundationModel))
+	resourceBody.SetAttributeValue("instruction", cty.StringVal(agent.Instruction))
 
-	// Set basic attributes
-	moduleBody.SetAttributeValue("name", cty.StringVal(resource.Metadata.Name))
-	moduleBody.SetAttributeValue("foundation_model", cty.StringVal(agent.FoundationModel))
-	moduleBody.SetAttributeValue("instruction", cty.StringVal(agent.Instruction))
-
-	// IAM role is generated separately and referenced via module output
+	// IAM role is generated separately and referenced via resource output
 	agentRoleName := fmt.Sprintf("%s_execution_role", g.sanitizeResourceName(resource.Metadata.Name))
-	moduleBody.SetAttributeValue("agent_resource_role_arn", cty.StringVal(fmt.Sprintf("${module.%s.role_arn}", agentRoleName)))
+	resourceBody.SetAttributeValue("agent_resource_role_arn", cty.StringVal(fmt.Sprintf("${aws_iam_role.%s.arn}", agentRoleName)))
 
-	// Optional attributes
+	// Optional attributes according to AWS provider schema
 	if agent.Description != "" {
-		moduleBody.SetAttributeValue("description", cty.StringVal(agent.Description))
+		resourceBody.SetAttributeValue("agent_description", cty.StringVal(agent.Description))
 	}
 
 	if agent.IdleSessionTTL > 0 {
-		moduleBody.SetAttributeValue("idle_session_ttl", cty.NumberIntVal(int64(agent.IdleSessionTTL)))
+		resourceBody.SetAttributeValue("idle_session_ttl_in_seconds", cty.NumberIntVal(int64(agent.IdleSessionTTL)))
 	}
 
 	if agent.CustomerEncryptionKey != "" {
-		moduleBody.SetAttributeValue("customer_encryption_key", cty.StringVal(agent.CustomerEncryptionKey))
+		resourceBody.SetAttributeValue("customer_encryption_key_arn", cty.StringVal(agent.CustomerEncryptionKey))
 	}
 
 	// Tags
@@ -72,7 +65,33 @@ func (g *HCLGenerator) generateAgentModule(body *hclwrite.Body, resource models.
 		for key, value := range agent.Tags {
 			tagValues[key] = cty.StringVal(value)
 		}
-		moduleBody.SetAttributeValue("tags", cty.ObjectVal(tagValues))
+		resourceBody.SetAttributeValue("tags", cty.ObjectVal(tagValues))
+	}
+
+	// New Terraform-specific attributes
+	if agent.PrepareAgent != nil {
+		resourceBody.SetAttributeValue("prepare_agent", cty.BoolVal(*agent.PrepareAgent))
+	}
+
+	if agent.SkipResourceInUseCheck != nil {
+		resourceBody.SetAttributeValue("skip_resource_in_use_check", cty.BoolVal(*agent.SkipResourceInUseCheck))
+	}
+
+	// Timeouts configuration
+	if agent.Timeouts != nil {
+		timeoutValues := make(map[string]cty.Value)
+		if agent.Timeouts.Create != "" {
+			timeoutValues["create"] = cty.StringVal(agent.Timeouts.Create)
+		}
+		if agent.Timeouts.Update != "" {
+			timeoutValues["update"] = cty.StringVal(agent.Timeouts.Update)
+		}
+		if agent.Timeouts.Delete != "" {
+			timeoutValues["delete"] = cty.StringVal(agent.Timeouts.Delete)
+		}
+		if len(timeoutValues) > 0 {
+			resourceBody.SetAttributeValue("timeouts", cty.ObjectVal(timeoutValues))
+		}
 	}
 
 	// Guardrail configuration
@@ -98,7 +117,7 @@ func (g *HCLGenerator) generateAgentModule(body *hclwrite.Body, resource models.
 			g.logger.WithError(err).WithField("guardrail", agent.Guardrail.Name.String()).Warn("Failed to resolve guardrail reference")
 		}
 
-		moduleBody.SetAttributeValue("guardrail", cty.ObjectVal(guardrailValues))
+		resourceBody.SetAttributeValue("guardrail", cty.ObjectVal(guardrailValues))
 	}
 
 	// Knowledge bases are handled through separate association resources
@@ -199,7 +218,7 @@ func (g *HCLGenerator) generateAgentModule(body *hclwrite.Body, resource models.
 
 			agList = append(agList, cty.ObjectVal(agValues))
 		}
-		moduleBody.SetAttributeValue("action_groups", cty.ListVal(agList))
+		resourceBody.SetAttributeValue("action_groups", cty.ListVal(agList))
 	}
 
 	// Prompt overrides
@@ -235,7 +254,7 @@ func (g *HCLGenerator) generateAgentModule(body *hclwrite.Body, resource models.
 
 			poList = append(poList, cty.ObjectVal(poValues))
 		}
-		moduleBody.SetAttributeValue("prompt_overrides", cty.ListVal(poList))
+		resourceBody.SetAttributeValue("prompt_overrides", cty.ListVal(poList))
 	}
 
 	// Memory configuration
@@ -254,7 +273,7 @@ func (g *HCLGenerator) generateAgentModule(body *hclwrite.Body, resource models.
 			memoryValues["storage_days"] = cty.NumberIntVal(int64(agent.MemoryConfiguration.StorageDays))
 		}
 
-		moduleBody.SetAttributeValue("memory_configuration", cty.ObjectVal(memoryValues))
+		resourceBody.SetAttributeValue("memory_configuration", cty.ObjectVal(memoryValues))
 	}
 
 	body.AppendNewline()

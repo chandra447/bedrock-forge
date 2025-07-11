@@ -125,6 +125,23 @@ func (g *HCLGenerator) generatePromptModule(body *hclwrite.Body, resource models
 		moduleBody.SetAttributeValue("tags", cty.ObjectVal(tagValues))
 	}
 
+	// Timeouts configuration
+	if prompt.Timeouts != nil {
+		timeoutValues := make(map[string]cty.Value)
+		if prompt.Timeouts.Create != "" {
+			timeoutValues["create"] = cty.StringVal(prompt.Timeouts.Create)
+		}
+		if prompt.Timeouts.Update != "" {
+			timeoutValues["update"] = cty.StringVal(prompt.Timeouts.Update)
+		}
+		if prompt.Timeouts.Delete != "" {
+			timeoutValues["delete"] = cty.StringVal(prompt.Timeouts.Delete)
+		}
+		if len(timeoutValues) > 0 {
+			moduleBody.SetAttributeValue("timeouts", cty.ObjectVal(timeoutValues))
+		}
+	}
+
 	body.AppendNewline()
 
 	g.logger.WithField("prompt", resource.Metadata.Name).Info("Generated prompt module")
@@ -193,13 +210,29 @@ func (g *HCLGenerator) generateTemplateConfiguration(templateConfig *models.Temp
 				chatValues["system"] = cty.ListVal(systemList)
 			}
 
-			// Tool configuration
+			// Tool configuration - always include for consistency
 			if templateConfig.Chat.ToolConfiguration != nil {
 				toolConfig, err := g.generateToolConfiguration(templateConfig.Chat.ToolConfiguration)
 				if err != nil {
 					return cty.NilVal, fmt.Errorf("failed to generate tool configuration: %w", err)
 				}
 				chatValues["tool_configuration"] = toolConfig
+			} else {
+				// Include empty tool configuration with same structure for consistency
+				chatValues["tool_configuration"] = cty.ObjectVal(map[string]cty.Value{
+					"tools": cty.ListValEmpty(cty.Object(map[string]cty.Type{
+						"tool_spec": cty.Object(map[string]cty.Type{
+							"name": cty.String,
+							"description": cty.String,
+							"input_schema": cty.Object(map[string]cty.Type{
+								"json": cty.String,
+							}),
+						}),
+					})),
+					"tool_choice": cty.ObjectVal(map[string]cty.Value{
+						"auto": cty.EmptyObjectVal,
+					}),
+				})
 			}
 
 			// Input variables for chat template
@@ -283,28 +316,41 @@ func (g *HCLGenerator) generateInferenceConfiguration(inferenceConfig *models.In
 	if inferenceConfig.Text != nil {
 		textInferenceValues := make(map[string]cty.Value)
 
+		// Always include all inference configuration fields for consistency
 		if inferenceConfig.Text.Temperature != nil {
 			textInferenceValues["temperature"] = cty.NumberFloatVal(*inferenceConfig.Text.Temperature)
+		} else {
+			textInferenceValues["temperature"] = cty.NullVal(cty.Number)
 		}
 
 		if inferenceConfig.Text.TopP != nil {
 			textInferenceValues["top_p"] = cty.NumberFloatVal(*inferenceConfig.Text.TopP)
+		} else {
+			textInferenceValues["top_p"] = cty.NullVal(cty.Number)
 		}
 
 		if inferenceConfig.Text.TopK != nil {
 			textInferenceValues["top_k"] = cty.NumberIntVal(int64(*inferenceConfig.Text.TopK))
+		} else {
+			textInferenceValues["top_k"] = cty.NullVal(cty.Number)
 		}
 
 		if inferenceConfig.Text.MaxTokens != nil {
 			textInferenceValues["max_tokens"] = cty.NumberIntVal(int64(*inferenceConfig.Text.MaxTokens))
+		} else {
+			textInferenceValues["max_tokens"] = cty.NullVal(cty.Number)
 		}
 
+		// Always include stop_sequences field for consistency
 		if len(inferenceConfig.Text.StopSequences) > 0 {
 			stopSequences := make([]cty.Value, 0, len(inferenceConfig.Text.StopSequences))
 			for _, stopSequence := range inferenceConfig.Text.StopSequences {
 				stopSequences = append(stopSequences, cty.StringVal(stopSequence))
 			}
 			textInferenceValues["stop_sequences"] = cty.ListVal(stopSequences)
+		} else {
+			// Include empty stop_sequences list for consistency
+			textInferenceValues["stop_sequences"] = cty.ListValEmpty(cty.String)
 		}
 
 		inferenceValues["text"] = cty.ObjectVal(textInferenceValues)

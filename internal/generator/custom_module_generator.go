@@ -40,7 +40,7 @@ func (g *HCLGenerator) generateCustomResourcesModule(body *hclwrite.Body, resour
 	g.logger.WithField("custom_resources", resource.Metadata.Name).Debug("Processing custom resources")
 
 	// Copy user's .tf files to output directory
-	if err := g.copyUserTerraformFiles(customResources); err != nil {
+	if err := g.copyUserTerraformFiles(customResources, resource.SourceFilePath); err != nil {
 		return fmt.Errorf("failed to copy user terraform files: %w", err)
 	}
 
@@ -95,28 +95,30 @@ func convertToCtyValue(value interface{}) (cty.Value, error) {
 }
 
 // copyUserTerraformFiles copies user's .tf files to the output directory
-func (g *HCLGenerator) copyUserTerraformFiles(spec models.CustomResourcesSpec) error {
+func (g *HCLGenerator) copyUserTerraformFiles(spec models.CustomResourcesSpec, sourceFilePath string) error {
 	if spec.Path != "" {
 		// Handle path-based approach
-		return g.copyTerraformPath(spec.Path)
+		return g.copyTerraformPath(spec.Path, sourceFilePath)
 	}
 
 	if len(spec.Files) > 0 {
 		// Handle files list approach
-		return g.copyTerraformFiles(spec.Files)
+		return g.copyTerraformFiles(spec.Files, sourceFilePath)
 	}
 
 	return fmt.Errorf("either 'path' or 'files' must be specified for CustomResources")
 }
 
 // copyTerraformPath copies all .tf files from a directory or a single .tf file
-func (g *HCLGenerator) copyTerraformPath(path string) error {
-	// Convert relative path to absolute path using source directory
+func (g *HCLGenerator) copyTerraformPath(path string, sourceFilePath string) error {
+	// Convert relative path to absolute path using source file directory
 	var srcPath string
 	if filepath.IsAbs(path) {
 		srcPath = path
 	} else {
-		srcPath = filepath.Join(g.config.SourceDir, path)
+		// Use directory of the source YAML file for relative path resolution
+		sourceDir := filepath.Dir(sourceFilePath)
+		srcPath = filepath.Join(sourceDir, path)
 	}
 
 	// Check if path exists
@@ -143,17 +145,20 @@ func (g *HCLGenerator) copyTerraformPath(path string) error {
 }
 
 // copyTerraformFiles copies specific .tf files
-func (g *HCLGenerator) copyTerraformFiles(files []string) error {
+func (g *HCLGenerator) copyTerraformFiles(files []string, sourceFilePath string) error {
 	for _, file := range files {
 		if !strings.HasSuffix(file, ".tf") {
 			return fmt.Errorf("file must have .tf extension: %s", file)
 		}
-		// Convert relative path to absolute path using source directory
+		// Convert relative path to absolute path using source file directory
 		var srcPath string
 		if filepath.IsAbs(file) {
 			srcPath = file
 		} else {
-			srcPath = filepath.Join(g.config.SourceDir, file)
+			// Use directory of the source YAML file for relative path resolution
+			sourceDir := filepath.Dir(sourceFilePath)
+			srcPath = filepath.Join(sourceDir, file)
+			g.logger.WithField("file", file).Debug("Resolving terraform file path")
 		}
 		if err := g.copyTerraformFile(srcPath); err != nil {
 			return fmt.Errorf("failed to copy file %s: %w", file, err)

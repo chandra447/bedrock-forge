@@ -326,11 +326,15 @@ func (g *HCLGenerator) topologicalSort(graph map[models.ResourceKind][]models.Re
 
 // generateModuleCall creates a module call for a specific resource
 func (g *HCLGenerator) generateModuleCall(body *hclwrite.Body, resource models.BaseResource) error {
+	g.logger.WithFields(logrus.Fields{
+		"kind": resource.Kind,
+		"name": resource.Metadata.Name,
+	}).Debug("Generating module call")
 	switch resource.Kind {
 	case models.AgentKind:
-		return g.generateAgentModule(body, resource)
+		return g.generateAgentNative(body, resource)
 	case models.LambdaKind:
-		return g.generateLambdaModule(body, resource)
+		return g.generateLambdaNative(body, resource)
 	case models.ActionGroupKind:
 		return g.generateActionGroupModule(body, resource)
 	case models.KnowledgeBaseKind:
@@ -425,7 +429,7 @@ func (g *HCLGenerator) addOutputsBlock(body *hclwrite.Body) {
 		agentIdBody := agentIdBlock.Body()
 		agentIdBody.SetAttributeValue("description", cty.StringVal(fmt.Sprintf("ID of the %s agent", agent.Metadata.Name)))
 		agentIdBody.SetAttributeTraversal("value", hcl.Traversal{
-			hcl.TraverseRoot{Name: "module"},
+			hcl.TraverseRoot{Name: "aws_bedrockagent_agent"},
 			hcl.TraverseAttr{Name: agentName},
 			hcl.TraverseAttr{Name: "agent_id"},
 		})
@@ -435,9 +439,127 @@ func (g *HCLGenerator) addOutputsBlock(body *hclwrite.Body) {
 		agentArnBody := agentArnBlock.Body()
 		agentArnBody.SetAttributeValue("description", cty.StringVal(fmt.Sprintf("ARN of the %s agent", agent.Metadata.Name)))
 		agentArnBody.SetAttributeTraversal("value", hcl.Traversal{
-			hcl.TraverseRoot{Name: "module"},
+			hcl.TraverseRoot{Name: "aws_bedrockagent_agent"},
 			hcl.TraverseAttr{Name: agentName},
 			hcl.TraverseAttr{Name: "agent_arn"},
+		})
+
+		// Agent Version output
+		agentVersionBlock := body.AppendNewBlock("output", []string{fmt.Sprintf("%s_agent_version", agentName)})
+		agentVersionBody := agentVersionBlock.Body()
+		agentVersionBody.SetAttributeValue("description", cty.StringVal(fmt.Sprintf("Version of the %s agent", agent.Metadata.Name)))
+		agentVersionBody.SetAttributeTraversal("value", hcl.Traversal{
+			hcl.TraverseRoot{Name: "aws_bedrockagent_agent"},
+			hcl.TraverseAttr{Name: agentName},
+			hcl.TraverseAttr{Name: "agent_version"},
+		})
+	}
+
+	// Action Group outputs
+	actionGroups := g.registry.GetResourcesByType(models.ActionGroupKind)
+	for _, actionGroup := range actionGroups {
+		agName := g.sanitizeResourceName(actionGroup.Metadata.Name)
+
+		// Action Group ID output
+		agIdBlock := body.AppendNewBlock("output", []string{fmt.Sprintf("%s_action_group_id", agName)})
+		agIdBody := agIdBlock.Body()
+		agIdBody.SetAttributeValue("description", cty.StringVal(fmt.Sprintf("ID of the %s action group", actionGroup.Metadata.Name)))
+		agIdBody.SetAttributeTraversal("value", hcl.Traversal{
+			hcl.TraverseRoot{Name: "module"},
+			hcl.TraverseAttr{Name: agName},
+			hcl.TraverseAttr{Name: "action_group_id"},
+		})
+	}
+
+	// Prompt outputs
+	prompts := g.registry.GetResourcesByType(models.PromptKind)
+	for _, prompt := range prompts {
+		promptName := g.sanitizeResourceName(prompt.Metadata.Name)
+
+		// Prompt ARN output
+		promptArnBlock := body.AppendNewBlock("output", []string{fmt.Sprintf("%s_prompt_arn", promptName)})
+		promptArnBody := promptArnBlock.Body()
+		promptArnBody.SetAttributeValue("description", cty.StringVal(fmt.Sprintf("ARN of the %s prompt", prompt.Metadata.Name)))
+		promptArnBody.SetAttributeTraversal("value", hcl.Traversal{
+			hcl.TraverseRoot{Name: "module"},
+			hcl.TraverseAttr{Name: promptName},
+			hcl.TraverseAttr{Name: "prompt_arn"},
+		})
+
+		// Prompt Version output
+		promptVersionBlock := body.AppendNewBlock("output", []string{fmt.Sprintf("%s_prompt_version", promptName)})
+		promptVersionBody := promptVersionBlock.Body()
+		promptVersionBody.SetAttributeValue("description", cty.StringVal(fmt.Sprintf("Version of the %s prompt", prompt.Metadata.Name)))
+		promptVersionBody.SetAttributeTraversal("value", hcl.Traversal{
+			hcl.TraverseRoot{Name: "module"},
+			hcl.TraverseAttr{Name: promptName},
+			hcl.TraverseAttr{Name: "version"},
+		})
+	}
+
+	// Lambda outputs
+	lambdas := g.registry.GetResourcesByType(models.LambdaKind)
+	for _, lambda := range lambdas {
+		lambdaName := g.sanitizeResourceName(lambda.Metadata.Name)
+
+		// Lambda Function ARN output
+		lambdaArnBlock := body.AppendNewBlock("output", []string{fmt.Sprintf("%s_lambda_arn", lambdaName)})
+		lambdaArnBody := lambdaArnBlock.Body()
+		lambdaArnBody.SetAttributeValue("description", cty.StringVal(fmt.Sprintf("ARN of the %s lambda function", lambda.Metadata.Name)))
+		lambdaArnBody.SetAttributeTraversal("value", hcl.Traversal{
+			hcl.TraverseRoot{Name: "aws_lambda_function"},
+			hcl.TraverseAttr{Name: lambdaName},
+			hcl.TraverseAttr{Name: "arn"},
+		})
+
+		// Lambda Function Name output
+		lambdaNameBlock := body.AppendNewBlock("output", []string{fmt.Sprintf("%s_lambda_name", lambdaName)})
+		lambdaNameBody := lambdaNameBlock.Body()
+		lambdaNameBody.SetAttributeValue("description", cty.StringVal(fmt.Sprintf("Name of the %s lambda function", lambda.Metadata.Name)))
+		lambdaNameBody.SetAttributeTraversal("value", hcl.Traversal{
+			hcl.TraverseRoot{Name: "aws_lambda_function"},
+			hcl.TraverseAttr{Name: lambdaName},
+			hcl.TraverseAttr{Name: "function_name"},
+		})
+
+		// Lambda Invoke ARN output
+		lambdaInvokeArnBlock := body.AppendNewBlock("output", []string{fmt.Sprintf("%s_lambda_invoke_arn", lambdaName)})
+		lambdaInvokeArnBody := lambdaInvokeArnBlock.Body()
+		lambdaInvokeArnBody.SetAttributeValue("description", cty.StringVal(fmt.Sprintf("Invoke ARN of the %s lambda function", lambda.Metadata.Name)))
+		lambdaInvokeArnBody.SetAttributeTraversal("value", hcl.Traversal{
+			hcl.TraverseRoot{Name: "aws_lambda_function"},
+			hcl.TraverseAttr{Name: lambdaName},
+			hcl.TraverseAttr{Name: "invoke_arn"},
+		})
+
+		// Lambda Version output
+		lambdaVersionBlock := body.AppendNewBlock("output", []string{fmt.Sprintf("%s_lambda_version", lambdaName)})
+		lambdaVersionBody := lambdaVersionBlock.Body()
+		lambdaVersionBody.SetAttributeValue("description", cty.StringVal(fmt.Sprintf("Version of the %s lambda function", lambda.Metadata.Name)))
+		lambdaVersionBody.SetAttributeTraversal("value", hcl.Traversal{
+			hcl.TraverseRoot{Name: "aws_lambda_function"},
+			hcl.TraverseAttr{Name: lambdaName},
+			hcl.TraverseAttr{Name: "version"},
+		})
+
+		// Lambda Last Modified output
+		lambdaLastModifiedBlock := body.AppendNewBlock("output", []string{fmt.Sprintf("%s_lambda_last_modified", lambdaName)})
+		lambdaLastModifiedBody := lambdaLastModifiedBlock.Body()
+		lambdaLastModifiedBody.SetAttributeValue("description", cty.StringVal(fmt.Sprintf("Last modified timestamp of the %s lambda function", lambda.Metadata.Name)))
+		lambdaLastModifiedBody.SetAttributeTraversal("value", hcl.Traversal{
+			hcl.TraverseRoot{Name: "aws_lambda_function"},
+			hcl.TraverseAttr{Name: lambdaName},
+			hcl.TraverseAttr{Name: "last_modified"},
+		})
+
+		// Lambda Role ARN output (if created)
+		lambdaRoleArnBlock := body.AppendNewBlock("output", []string{fmt.Sprintf("%s_lambda_role_arn", lambdaName)})
+		lambdaRoleArnBody := lambdaRoleArnBlock.Body()
+		lambdaRoleArnBody.SetAttributeValue("description", cty.StringVal(fmt.Sprintf("ARN of the IAM role for %s lambda function", lambda.Metadata.Name)))
+		lambdaRoleArnBody.SetAttributeTraversal("value", hcl.Traversal{
+			hcl.TraverseRoot{Name: "aws_lambda_function"},
+			hcl.TraverseAttr{Name: lambdaName},
+			hcl.TraverseAttr{Name: "role"},
 		})
 	}
 
@@ -478,7 +600,7 @@ func (g *HCLGenerator) writeFile(path string, content []byte) error {
 	return os.WriteFile(path, content, 0644)
 }
 
-// resolveReferenceToOutput resolves a Reference to a specific module output
+// resolveReferenceToOutput resolves a Reference to a specific native resource output
 func (g *HCLGenerator) resolveReferenceToOutput(ref models.Reference, expectedKind models.ResourceKind, outputName string) (string, error) {
 	if ref.IsEmpty() {
 		return "", fmt.Errorf("empty reference")
@@ -491,21 +613,38 @@ func (g *HCLGenerator) resolveReferenceToOutput(ref models.Reference, expectedKi
 		return "", fmt.Errorf("resource %s of kind %s not found in registry", resourceName, expectedKind)
 	}
 
-	// Return the module output reference
+	// Return the native resource reference
 	sanitizedName := g.sanitizeResourceName(resourceName)
-	return fmt.Sprintf("${module.%s.%s}", sanitizedName, outputName), nil
+	
+	// Map resource kinds to their AWS resource types and outputs
+	switch expectedKind {
+	case models.AgentKind:
+		return fmt.Sprintf("${aws_bedrockagent_agent.%s.%s}", sanitizedName, outputName), nil
+	case models.LambdaKind:
+		// Map common output names to AWS Lambda resource attributes
+		switch outputName {
+		case "lambda_function_arn":
+			return fmt.Sprintf("${aws_lambda_function.%s.arn}", sanitizedName), nil
+		case "lambda_function_name":
+			return fmt.Sprintf("${aws_lambda_function.%s.function_name}", sanitizedName), nil
+		case "lambda_function_invoke_arn":
+			return fmt.Sprintf("${aws_lambda_function.%s.invoke_arn}", sanitizedName), nil
+		default:
+			return fmt.Sprintf("${aws_lambda_function.%s.%s}", sanitizedName, outputName), nil
+		}
+	case models.IAMRoleKind:
+		return fmt.Sprintf("${aws_iam_role.%s.%s}", sanitizedName, outputName), nil
+	default:
+		// For other resource types, use the generic pattern
+		return fmt.Sprintf("${module.%s.%s}", sanitizedName, outputName), nil
+	}
 }
 
 // generateAutoIAMRoles generates IAM roles for all agents automatically
 func (g *HCLGenerator) generateAutoIAMRoles(body *hclwrite.Body) {
-	agents := g.registry.GetResourcesByType(models.AgentKind)
-
-	for _, agentResource := range agents {
-		// Generate IAM role for every agent
-		if err := g.generateAutoIAMRole(body, agentResource.Metadata.Name, nil); err != nil {
-			g.logger.WithError(err).WithField("agent", agentResource.Metadata.Name).Warn("Failed to generate auto IAM role")
-		}
-	}
+	// Skip IAM role generation as agents now generate their own roles natively
+	// This is handled in the generateAgentNative function
+	g.logger.Debug("Skipping auto IAM role generation - agents now generate their own roles")
 }
 
 // generateAgentKnowledgeBaseAssociationModule creates a module call for an AgentKnowledgeBaseAssociation resource

@@ -181,33 +181,30 @@ func (g *HCLGenerator) generateActionGroupModule(body *hclwrite.Body, resource m
 				functionValues["description"] = cty.NullVal(cty.String)
 			}
 
-			// Always include parameters field, even if empty, for consistent structure
+			// Convert parameters to JSON string for consistent structure
 			if len(function.Parameters) > 0 {
-				paramValues := make(map[string]cty.Value)
+				// Convert to a map structure that can be JSON encoded
+				paramMap := make(map[string]interface{})
 				for paramName, param := range function.Parameters {
-					paramObj := make(map[string]cty.Value)
-
-					// Always include all fields for consistent structure
-					if param.Description != "" {
-						paramObj["description"] = cty.StringVal(param.Description)
-					} else {
-						paramObj["description"] = cty.NullVal(cty.String)
+					paramInfo := map[string]interface{}{
+						"description": param.Description,
+						"type":        param.Type,
+						"required":    param.Required,
 					}
-
-					if param.Type != "" {
-						paramObj["type"] = cty.StringVal(param.Type)
-					} else {
-						paramObj["type"] = cty.NullVal(cty.String)
-					}
-
-					paramObj["required"] = cty.BoolVal(param.Required)
-
-					paramValues[paramName] = cty.ObjectVal(paramObj)
+					paramMap[paramName] = paramInfo
 				}
-				functionValues["parameters"] = cty.ObjectVal(paramValues)
+				
+				// Convert to JSON string for consistent type
+				paramJSON, err := json.Marshal(paramMap)
+				if err != nil {
+					g.logger.WithError(err).Warn("Failed to marshal parameters")
+					functionValues["parameters"] = cty.StringVal("{}")
+				} else {
+					functionValues["parameters"] = cty.StringVal(string(paramJSON))
+				}
 			} else {
-				// Include empty parameters object for consistency
-				functionValues["parameters"] = cty.ObjectVal(make(map[string]cty.Value))
+				// Include empty parameters JSON for consistency
+				functionValues["parameters"] = cty.StringVal("{}")
 			}
 
 			functionList = append(functionList, cty.ObjectVal(functionValues))
@@ -225,6 +222,28 @@ func (g *HCLGenerator) generateActionGroupModule(body *hclwrite.Body, resource m
 			tagValues[key] = cty.StringVal(value)
 		}
 		moduleBody.SetAttributeValue("tags", cty.ObjectVal(tagValues))
+	}
+
+	// New Terraform-specific attributes
+	if actionGroup.PrepareAgent != nil {
+		moduleBody.SetAttributeValue("prepare_agent", cty.BoolVal(*actionGroup.PrepareAgent))
+	}
+
+	// Timeouts configuration
+	if actionGroup.Timeouts != nil {
+		timeoutValues := make(map[string]cty.Value)
+		if actionGroup.Timeouts.Create != "" {
+			timeoutValues["create"] = cty.StringVal(actionGroup.Timeouts.Create)
+		}
+		if actionGroup.Timeouts.Update != "" {
+			timeoutValues["update"] = cty.StringVal(actionGroup.Timeouts.Update)
+		}
+		if actionGroup.Timeouts.Delete != "" {
+			timeoutValues["delete"] = cty.StringVal(actionGroup.Timeouts.Delete)
+		}
+		if len(timeoutValues) > 0 {
+			moduleBody.SetAttributeValue("timeouts", cty.ObjectVal(timeoutValues))
+		}
 	}
 
 	body.AppendNewline()

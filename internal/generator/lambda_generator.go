@@ -133,6 +133,9 @@ func (g *HCLGenerator) generateLambdaModule(body *hclwrite.Body, resource models
 		}
 	}
 
+	// Handle new attributes
+	g.setLambdaAdvancedAttributes(moduleBody, lambda)
+
 	// Add IAM role for Lambda execution
 	moduleBody.SetAttributeValue("create_role", cty.BoolVal(true))
 
@@ -149,6 +152,17 @@ func (g *HCLGenerator) generateLambdaModule(body *hclwrite.Body, resource models
 	return nil
 }
 
+// createPolicyStatement creates a consistent policy statement with all required fields
+func (g *HCLGenerator) createPolicyStatement(sid, effect string, principals []cty.Value, actions []cty.Value, condition cty.Value) cty.Value {
+	return cty.ObjectVal(map[string]cty.Value{
+		"sid":        cty.StringVal(sid),
+		"effect":     cty.StringVal(effect),
+		"principals": cty.ListVal(principals),
+		"actions":    cty.ListVal(actions),
+		"condition":  condition,
+	})
+}
+
 // generateLambdaResourcePolicies creates resource-based policies for Lambda functions
 func (g *HCLGenerator) generateLambdaResourcePolicies(lambdaName string, lambda models.LambdaSpec) []cty.Value {
 	var policyStatements []cty.Value
@@ -156,13 +170,9 @@ func (g *HCLGenerator) generateLambdaResourcePolicies(lambdaName string, lambda 
 	// Add custom statements if provided (for advanced users)
 	if lambda.ResourcePolicy != nil && len(lambda.ResourcePolicy.Statements) > 0 {
 		for _, stmt := range lambda.ResourcePolicy.Statements {
-			stmtValues := make(map[string]cty.Value)
-			stmtValues["sid"] = cty.StringVal(stmt.Sid)
-			stmtValues["effect"] = cty.StringVal(stmt.Effect)
-
 			// Handle principals
+			var principalList []cty.Value
 			if len(stmt.Principal) > 0 {
-				principalList := make([]cty.Value, 0)
 				for pType, pValues := range stmt.Principal {
 					switch values := pValues.(type) {
 					case string:
@@ -183,35 +193,52 @@ func (g *HCLGenerator) generateLambdaResourcePolicies(lambdaName string, lambda 
 						}))
 					}
 				}
-				stmtValues["principals"] = cty.ListVal(principalList)
 			}
 
 			// Handle actions
+			var actionList []cty.Value
 			switch actions := stmt.Action.(type) {
 			case string:
-				stmtValues["actions"] = cty.ListVal([]cty.Value{cty.StringVal(actions)})
+				actionList = []cty.Value{cty.StringVal(actions)}
 			case []interface{}:
-				actionList := make([]cty.Value, 0)
 				for _, action := range actions {
 					if str, ok := action.(string); ok {
 						actionList = append(actionList, cty.StringVal(str))
 					}
 				}
-				stmtValues["actions"] = cty.ListVal(actionList)
 			}
 
-			// Handle conditions
+			// Handle conditions - ensure consistent structure
+			var conditionVal cty.Value
 			if len(stmt.Condition) > 0 {
 				conditionValues := make(map[string]cty.Value)
 				for k, v := range stmt.Condition {
-					if str, ok := v.(string); ok {
-						conditionValues[k] = cty.StringVal(str)
-					}
+					if objVal, ok := v.(map[string]interface{}); ok {
+						// Handle nested condition objects, ensuring consistent structure
+						nestedValues := make(map[string]cty.Value)
+						
+						// Normalize to have consistent schema with agent conditions
+						nestedValues["aws:SourceArn"] = cty.StringVal("")
+						nestedValues["aws:SourceAccount"] = cty.StringVal("")
+						
+						for nk, nv := range objVal {
+							if nstr, ok := nv.(string); ok {
+								nestedValues[nk] = cty.StringVal(nstr)
+							}
+						}
+					conditionValues[k] = cty.ObjectVal(nestedValues)
+					continue
 				}
-				stmtValues["condition"] = cty.ObjectVal(conditionValues)
+				
+				conditionValues[k] = cty.StringVal(fmt.Sprintf("%v", v))
 			}
+			conditionVal = cty.ObjectVal(conditionValues)
+		} else {
+			// Create empty condition with consistent structure
+			conditionVal = cty.EmptyObjectVal
+		}
 
-			policyStatements = append(policyStatements, cty.ObjectVal(stmtValues))
+			policyStatements = append(policyStatements, g.createPolicyStatement(stmt.Sid, stmt.Effect, principalList, actionList, conditionVal))
 		}
 	}
 
@@ -223,24 +250,35 @@ func (g *HCLGenerator) generateLambdaResourcePolicies(lambdaName string, lambda 
 		for _, agentName := range referencingAgents {
 			agentResourceName := g.sanitizeResourceName(agentName)
 
-			agentStmt := cty.ObjectVal(map[string]cty.Value{
-				"sid":    cty.StringVal(fmt.Sprintf("AllowBedrockAgent_%s", agentResourceName)),
-				"effect": cty.StringVal("Allow"),
-				"principals": cty.ListVal([]cty.Value{
-					cty.ObjectVal(map[string]cty.Value{
-						"type":        cty.StringVal("Service"),
-						"identifiers": cty.ListVal([]cty.Value{cty.StringVal("bedrock.amazonaws.com")}),
-					}),
+			// Create principals for agent permission
+			agentPrincipals := []cty.Value{
+				cty.ObjectVal(map[string]cty.Value{
+					"type":        cty.StringVal("Service"),
+					"identifiers": cty.ListVal([]cty.Value{cty.StringVal("bedrock.amazonaws.com")}),
 				}),
-				"actions": cty.ListVal([]cty.Value{
-					cty.StringVal("lambda:InvokeFunction"),
-				}),
-				"condition": cty.ObjectVal(map[string]cty.Value{
-					"StringEquals": cty.ObjectVal(map[string]cty.Value{
-						"aws:SourceArn": cty.StringVal(fmt.Sprintf("${module.%s.agent_arn}", agentResourceName)),
-					}),
+			}
+
+			// Create actions for agent permission
+			agentActions := []cty.Value{
+				cty.StringVal("lambda:InvokeFunction"),
+			}
+
+			// Create condition for agent permission with consistent structure
+			// Normalize all conditions to have consistent field schemas
+			agentCondition := cty.ObjectVal(map[string]cty.Value{
+				"StringEquals": cty.ObjectVal(map[string]cty.Value{
+					"aws:SourceArn": cty.StringVal(fmt.Sprintf("${module.%s.agent_arn}", agentResourceName)),
+					"aws:SourceAccount": cty.StringVal(""), // Add empty field for consistency
 				}),
 			})
+
+			agentStmt := g.createPolicyStatement(
+				fmt.Sprintf("AllowBedrockAgent_%s", agentResourceName),
+				"Allow",
+				agentPrincipals,
+				agentActions,
+				agentCondition,
+			)
 
 			policyStatements = append(policyStatements, agentStmt)
 
@@ -249,19 +287,26 @@ func (g *HCLGenerator) generateLambdaResourcePolicies(lambdaName string, lambda 
 	} else {
 		// If no agents reference this Lambda, add general Bedrock permission (unless explicitly disabled)
 		if lambda.ResourcePolicy == nil || lambda.ResourcePolicy.AllowBedrockAgents {
-			defaultStmt := cty.ObjectVal(map[string]cty.Value{
-				"sid":    cty.StringVal("AllowBedrockAgentInvoke"),
-				"effect": cty.StringVal("Allow"),
-				"principals": cty.ListVal([]cty.Value{
-					cty.ObjectVal(map[string]cty.Value{
-						"type":        cty.StringVal("Service"),
-						"identifiers": cty.ListVal([]cty.Value{cty.StringVal("bedrock.amazonaws.com")}),
-					}),
+			// Create principals for default permission
+			defaultPrincipals := []cty.Value{
+				cty.ObjectVal(map[string]cty.Value{
+					"type":        cty.StringVal("Service"),
+					"identifiers": cty.ListVal([]cty.Value{cty.StringVal("bedrock.amazonaws.com")}),
 				}),
-				"actions": cty.ListVal([]cty.Value{
-					cty.StringVal("lambda:InvokeFunction"),
-				}),
-			})
+			}
+
+			// Create actions for default permission
+			defaultActions := []cty.Value{
+				cty.StringVal("lambda:InvokeFunction"),
+			}
+
+			defaultStmt := g.createPolicyStatement(
+				"AllowBedrockAgentInvoke",
+				"Allow",
+				defaultPrincipals,
+				defaultActions,
+				cty.EmptyObjectVal,
+			)
 			policyStatements = append(policyStatements, defaultStmt)
 		}
 	}
@@ -331,4 +376,164 @@ func extractAgentNameFromId(agentId string) string {
 	// In practice, standalone ActionGroups with direct agent ARNs won't be used
 	// for Lambda permission generation since we can't determine the agent name
 	return ""
+}
+
+// setLambdaAdvancedAttributes sets the new advanced Lambda attributes
+func (g *HCLGenerator) setLambdaAdvancedAttributes(moduleBody *hclwrite.Body, lambda models.LambdaSpec) {
+	// Role handling - prefer direct ARN over reference
+	if lambda.RoleArn != "" {
+		moduleBody.SetAttributeValue("role", cty.StringVal(lambda.RoleArn))
+	} else if !lambda.Role.IsEmpty() {
+		// Handle reference to IAM role
+		if roleRef, err := g.resolveReferenceToOutput(lambda.Role, models.IAMRoleKind, "role_arn"); err == nil {
+			moduleBody.SetAttributeValue("role", cty.StringVal(roleRef))
+		} else {
+			g.logger.WithError(err).WithField("lambda", lambda.Role.String()).Warn("Failed to resolve IAM role reference")
+		}
+	}
+
+	// Architectures
+	if len(lambda.Architectures) > 0 {
+		archVals := make([]cty.Value, 0, len(lambda.Architectures))
+		for _, arch := range lambda.Architectures {
+			archVals = append(archVals, cty.StringVal(arch))
+		}
+		moduleBody.SetAttributeValue("architectures", cty.ListVal(archVals))
+	}
+
+	// Code signing config
+	if lambda.CodeSigningConfigArn != "" {
+		moduleBody.SetAttributeValue("code_signing_config_arn", cty.StringVal(lambda.CodeSigningConfigArn))
+	}
+
+	// Dead letter config
+	if lambda.DeadLetterConfig != nil {
+		dlcValues := map[string]cty.Value{
+			"target_arn": cty.StringVal(lambda.DeadLetterConfig.TargetArn),
+		}
+		moduleBody.SetAttributeValue("dead_letter_config", cty.ObjectVal(dlcValues))
+	}
+
+	// Ephemeral storage
+	if lambda.EphemeralStorage != nil {
+		esValues := map[string]cty.Value{
+			"size": cty.NumberIntVal(int64(lambda.EphemeralStorage.Size)),
+		}
+		moduleBody.SetAttributeValue("ephemeral_storage", cty.ObjectVal(esValues))
+	}
+
+	// File system config
+	if lambda.FileSystemConfig != nil {
+		fscValues := map[string]cty.Value{
+			"arn":              cty.StringVal(lambda.FileSystemConfig.Arn),
+			"local_mount_path": cty.StringVal(lambda.FileSystemConfig.LocalMountPath),
+		}
+		moduleBody.SetAttributeValue("file_system_config", cty.ObjectVal(fscValues))
+	}
+
+	// Image config
+	if lambda.ImageConfig != nil {
+		imgValues := make(map[string]cty.Value)
+		if len(lambda.ImageConfig.Command) > 0 {
+			cmdVals := make([]cty.Value, 0, len(lambda.ImageConfig.Command))
+			for _, cmd := range lambda.ImageConfig.Command {
+				cmdVals = append(cmdVals, cty.StringVal(cmd))
+			}
+			imgValues["command"] = cty.ListVal(cmdVals)
+		}
+		if len(lambda.ImageConfig.EntryPoint) > 0 {
+			epVals := make([]cty.Value, 0, len(lambda.ImageConfig.EntryPoint))
+			for _, ep := range lambda.ImageConfig.EntryPoint {
+				epVals = append(epVals, cty.StringVal(ep))
+			}
+			imgValues["entry_point"] = cty.ListVal(epVals)
+		}
+		if lambda.ImageConfig.WorkingDirectory != "" {
+			imgValues["working_directory"] = cty.StringVal(lambda.ImageConfig.WorkingDirectory)
+		}
+		if len(imgValues) > 0 {
+			moduleBody.SetAttributeValue("image_config", cty.ObjectVal(imgValues))
+		}
+	}
+
+	// KMS key
+	if lambda.KmsKeyArn != "" {
+		moduleBody.SetAttributeValue("kms_key_arn", cty.StringVal(lambda.KmsKeyArn))
+	}
+
+	// Layers
+	if len(lambda.Layers) > 0 {
+		layerVals := make([]cty.Value, 0, len(lambda.Layers))
+		for _, layer := range lambda.Layers {
+			layerVals = append(layerVals, cty.StringVal(layer))
+		}
+		moduleBody.SetAttributeValue("layers", cty.ListVal(layerVals))
+	}
+
+	// Package type
+	if lambda.PackageType != "" {
+		moduleBody.SetAttributeValue("package_type", cty.StringVal(lambda.PackageType))
+	}
+
+	// Publish
+	if lambda.Publish != nil {
+		moduleBody.SetAttributeValue("publish", cty.BoolVal(*lambda.Publish))
+	}
+
+	// Replace security groups on destroy
+	if lambda.ReplaceSecurityGroupsOnDestroy != nil {
+		moduleBody.SetAttributeValue("replace_security_groups_on_destroy", cty.BoolVal(*lambda.ReplaceSecurityGroupsOnDestroy))
+	}
+
+	// Replacement security group IDs
+	if len(lambda.ReplacementSecurityGroupIds) > 0 {
+		rsgVals := make([]cty.Value, 0, len(lambda.ReplacementSecurityGroupIds))
+		for _, rsgId := range lambda.ReplacementSecurityGroupIds {
+			rsgVals = append(rsgVals, cty.StringVal(rsgId))
+		}
+		moduleBody.SetAttributeValue("replacement_security_group_ids", cty.ListVal(rsgVals))
+	}
+
+	// Skip destroy
+	if lambda.SkipDestroy != nil {
+		moduleBody.SetAttributeValue("skip_destroy", cty.BoolVal(*lambda.SkipDestroy))
+	}
+
+	// SnapStart
+	if lambda.SnapStart != nil {
+		ssValues := map[string]cty.Value{
+			"apply_on": cty.StringVal(lambda.SnapStart.ApplyOn),
+		}
+		moduleBody.SetAttributeValue("snap_start", cty.ObjectVal(ssValues))
+	}
+
+	// Source code hash
+	if lambda.SourceCodeHash != "" {
+		moduleBody.SetAttributeValue("source_code_hash", cty.StringVal(lambda.SourceCodeHash))
+	}
+
+	// Timeouts
+	if lambda.Timeouts != nil {
+		timeoutValues := make(map[string]cty.Value)
+		if lambda.Timeouts.Create != "" {
+			timeoutValues["create"] = cty.StringVal(lambda.Timeouts.Create)
+		}
+		if lambda.Timeouts.Update != "" {
+			timeoutValues["update"] = cty.StringVal(lambda.Timeouts.Update)
+		}
+		if lambda.Timeouts.Delete != "" {
+			timeoutValues["delete"] = cty.StringVal(lambda.Timeouts.Delete)
+		}
+		if len(timeoutValues) > 0 {
+			moduleBody.SetAttributeValue("timeouts", cty.ObjectVal(timeoutValues))
+		}
+	}
+
+	// Tracing config
+	if lambda.TracingConfig != nil {
+		tcValues := map[string]cty.Value{
+			"mode": cty.StringVal(lambda.TracingConfig.Mode),
+		}
+		moduleBody.SetAttributeValue("tracing_config", cty.ObjectVal(tcValues))
+	}
 }
