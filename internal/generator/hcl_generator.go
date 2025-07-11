@@ -478,7 +478,6 @@ func (g *HCLGenerator) writeFile(path string, content []byte) error {
 	return os.WriteFile(path, content, 0644)
 }
 
-
 // resolveReferenceToOutput resolves a Reference to a specific module output
 func (g *HCLGenerator) resolveReferenceToOutput(ref models.Reference, expectedKind models.ResourceKind, outputName string) (string, error) {
 	if ref.IsEmpty() {
