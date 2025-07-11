@@ -55,7 +55,14 @@ var validateCmd = &cobra.Command{
 var generateCmd = &cobra.Command{
 	Use:   "generate [path] [output-dir]",
 	Short: "Generate Terraform configuration from YAML resources",
-	Long:  `Generate Terraform configuration files from discovered YAML resources.`,
+	Long:  `Generate Terraform configuration files from discovered YAML resources.
+
+Arguments:
+  path        Path to directory containing YAML files (default: current directory)
+  output-dir  Output directory for generated Terraform files (default: outputs_tf)
+
+The generated Terraform files will be placed in the outputs_tf directory by default,
+so you can immediately inspect the generated .tf files without any additional setup.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		var scanPath, outputDir string
 		if len(args) > 0 {

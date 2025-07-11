@@ -36,9 +36,9 @@ func (c *GenerateCommand) Execute(scanPath, outputDir string) error {
 		}
 	}
 
-	// Use './terraform' as default output directory
+	// Use './outputs_tf' as default output directory
 	if outputDir == "" {
-		outputDir = filepath.Join(scanPath, "terraform")
+		outputDir = "outputs_tf"
 	}
 
 	// Initialize registry and parser
@@ -70,6 +70,7 @@ func (c *GenerateCommand) Execute(scanPath, outputDir string) error {
 		ModuleRegistry: "git::https://github.com/company/bedrock-terraform-modules",
 		ModuleVersion:  "v1.0.0",
 		OutputDir:      outputDir,
+		SourceDir:      scanPath,
 		ProjectName:    "bedrock-project",
 		Environment:    "dev",
 	}
