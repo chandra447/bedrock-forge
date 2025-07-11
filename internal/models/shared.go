@@ -21,10 +21,11 @@ const (
 )
 
 type BaseResource struct {
-	Kind       ResourceKind `yaml:"kind"`
-	APIVersion string       `yaml:"apiVersion,omitempty"`
-	Metadata   Metadata     `yaml:"metadata"`
-	Spec       interface{}  `yaml:"spec"`
+	Kind           ResourceKind `yaml:"kind"`
+	APIVersion     string       `yaml:"apiVersion,omitempty"`
+	Metadata       Metadata     `yaml:"metadata"`
+	Spec           interface{}  `yaml:"spec"`
+	SourceFilePath string       `yaml:"-"` // Not serialized to YAML
 }
 
 type Metadata struct {

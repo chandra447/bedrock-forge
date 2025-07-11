@@ -2,8 +2,8 @@ package models
 
 // IAMRoleConfig provides flexible IAM role management for agents
 type IAMRoleConfig struct {
-	// For auto-generated roles
-	AutoCreate bool `yaml:"autoCreate,omitempty"`
+	// For auto-generated roles (default: true)
+	AutoCreate *bool `yaml:"autoCreate,omitempty"`
 
 	// For existing role ARN
 	RoleArn string `yaml:"roleArn,omitempty"`

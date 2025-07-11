@@ -13,6 +13,9 @@ type PromptSpec struct {
 	InputVariables           []PromptInputVariable `yaml:"inputVariables,omitempty"`
 	Variants                 []PromptVariant       `yaml:"variants"`
 	Tags                     map[string]string     `yaml:"tags,omitempty"`
+	
+	// Missing Terraform attributes
+	Timeouts                 *PromptTimeouts       `yaml:"timeouts,omitempty"`
 }
 
 type PromptInputVariable struct {
@@ -120,4 +123,11 @@ type TextInferenceConfiguration struct {
 	TopK          *int     `yaml:"topK,omitempty"`
 	MaxTokens     *int     `yaml:"maxTokens,omitempty"`
 	StopSequences []string `yaml:"stopSequences,omitempty"`
+}
+
+// PromptTimeouts represents timeout configuration for prompt operations
+type PromptTimeouts struct {
+	Create string `yaml:"create,omitempty"` // Default: 5m
+	Update string `yaml:"update,omitempty"` // Default: 5m
+	Delete string `yaml:"delete,omitempty"` // Default: 5m
 }
