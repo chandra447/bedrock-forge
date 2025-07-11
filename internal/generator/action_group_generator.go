@@ -174,41 +174,41 @@ func (g *HCLGenerator) generateActionGroupModule(body *hclwrite.Body, resource m
 			functionValues := make(map[string]cty.Value)
 			functionValues["name"] = cty.StringVal(function.Name)
 
-		// Always include description field for consistent structure
-		if function.Description != "" {
-			functionValues["description"] = cty.StringVal(function.Description)
-		} else {
-			functionValues["description"] = cty.NullVal(cty.String)
-		}
-
-		// Always include parameters field, even if empty, for consistent structure
-		if len(function.Parameters) > 0 {
-			paramValues := make(map[string]cty.Value)
-			for paramName, param := range function.Parameters {
-				paramObj := make(map[string]cty.Value)
-
-				// Always include all fields for consistent structure
-				if param.Description != "" {
-					paramObj["description"] = cty.StringVal(param.Description)
-				} else {
-					paramObj["description"] = cty.NullVal(cty.String)
-				}
-
-				if param.Type != "" {
-					paramObj["type"] = cty.StringVal(param.Type)
-				} else {
-					paramObj["type"] = cty.NullVal(cty.String)
-				}
-
-				paramObj["required"] = cty.BoolVal(param.Required)
-
-				paramValues[paramName] = cty.ObjectVal(paramObj)
+			// Always include description field for consistent structure
+			if function.Description != "" {
+				functionValues["description"] = cty.StringVal(function.Description)
+			} else {
+				functionValues["description"] = cty.NullVal(cty.String)
 			}
-			functionValues["parameters"] = cty.ObjectVal(paramValues)
-		} else {
-			// Include empty parameters object for consistency
-			functionValues["parameters"] = cty.ObjectVal(make(map[string]cty.Value))
-		}
+
+			// Always include parameters field, even if empty, for consistent structure
+			if len(function.Parameters) > 0 {
+				paramValues := make(map[string]cty.Value)
+				for paramName, param := range function.Parameters {
+					paramObj := make(map[string]cty.Value)
+
+					// Always include all fields for consistent structure
+					if param.Description != "" {
+						paramObj["description"] = cty.StringVal(param.Description)
+					} else {
+						paramObj["description"] = cty.NullVal(cty.String)
+					}
+
+					if param.Type != "" {
+						paramObj["type"] = cty.StringVal(param.Type)
+					} else {
+						paramObj["type"] = cty.NullVal(cty.String)
+					}
+
+					paramObj["required"] = cty.BoolVal(param.Required)
+
+					paramValues[paramName] = cty.ObjectVal(paramObj)
+				}
+				functionValues["parameters"] = cty.ObjectVal(paramValues)
+			} else {
+				// Include empty parameters object for consistency
+				functionValues["parameters"] = cty.ObjectVal(make(map[string]cty.Value))
+			}
 
 			functionList = append(functionList, cty.ObjectVal(functionValues))
 		}
