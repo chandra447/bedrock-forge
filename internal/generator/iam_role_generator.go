@@ -178,10 +178,10 @@ func (g *HCLGenerator) generateIAMRoleModule(body *hclwrite.Body, resource model
 			policyObj := cty.ObjectVal(map[string]cty.Value{
 				"policy_arn": cty.StringVal(policy.PolicyArn),
 			})
-			if policy.PolicyName != "" {
+			if !policy.PolicyName.IsEmpty() {
 				policyObj = cty.ObjectVal(map[string]cty.Value{
 					"policy_arn":  cty.StringVal(policy.PolicyArn),
-					"policy_name": cty.StringVal(policy.PolicyName),
+					"policy_name": cty.StringVal(policy.PolicyName.String()),
 				})
 			}
 			policies = append(policies, policyObj)

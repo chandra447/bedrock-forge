@@ -24,7 +24,7 @@ spec:
     SecurityLevel: "medium"
   
   guardrail:
-    name: "data-dev-content-safety-guardrail"
+    name: {ref: data-dev-content-safety-guardrail}  # Reference using object syntax
     version: "1"
   
   memoryConfiguration:

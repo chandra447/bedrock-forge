@@ -77,7 +77,7 @@ type OpenSearchServerlessReference struct {
 	CollectionId  *string `yaml:"collectionId,omitempty"`
 
 	// For auto-created collections (reference by name)
-	CollectionName *string `yaml:"collectionName,omitempty"`
+	CollectionName *Reference `yaml:"collectionName,omitempty"` // Reference to OpenSearchServerless resource
 
 	// Vector index configuration
 	VectorIndexName string       `yaml:"vectorIndexName"`

@@ -49,10 +49,18 @@ func (g *HCLGenerator) generateActionGroupModule(body *hclwrite.Body, resource m
 	moduleBody.SetAttributeValue("action_group_name", cty.StringVal(resource.Metadata.Name))
 
 	// Set required agent_id
-	if actionGroup.AgentId == "" {
+	if actionGroup.AgentId.IsEmpty() {
 		return fmt.Errorf("action group %s must specify agentId", resource.Metadata.Name)
 	}
-	moduleBody.SetAttributeValue("agent_id", cty.StringVal(actionGroup.AgentId))
+
+	// Resolve agent reference to get agent ID
+	if agentId, err := g.resolveReferenceToOutput(actionGroup.AgentId, models.AgentKind, "agent_id"); err == nil {
+		moduleBody.SetAttributeValue("agent_id", cty.StringVal(agentId))
+	} else {
+		// Fallback to direct string value for backward compatibility
+		moduleBody.SetAttributeValue("agent_id", cty.StringVal(actionGroup.AgentId.String()))
+		g.logger.WithError(err).WithField("agent", actionGroup.AgentId.String()).Warn("Failed to resolve agent reference, using direct value")
+	}
 
 	// Set agent_version (defaults to DRAFT if not specified)
 	agentVersion := actionGroup.AgentVersion
@@ -96,21 +104,20 @@ func (g *HCLGenerator) generateActionGroupModule(body *hclwrite.Body, resource m
 				"action_group": resource.Metadata.Name,
 				"lambda_arn":   actionGroup.ActionGroupExecutor.LambdaArn,
 			}).Debug("Using existing Lambda ARN for action group executor")
-		} else if actionGroup.ActionGroupExecutor.Lambda != "" {
-			// Check if this is a reference to a Lambda module defined in the same project
-			if g.registry.HasResource(models.LambdaKind, actionGroup.ActionGroupExecutor.Lambda) {
-				lambdaName := g.sanitizeResourceName(actionGroup.ActionGroupExecutor.Lambda)
-				executorValues["lambda"] = cty.StringVal(fmt.Sprintf("${module.%s.lambda_function_arn}", lambdaName))
+		} else if !actionGroup.ActionGroupExecutor.Lambda.IsEmpty() {
+			// Reference to a Lambda module defined in the same project
+			if lambdaArn, err := g.resolveReferenceToOutput(actionGroup.ActionGroupExecutor.Lambda, models.LambdaKind, "lambda_function_arn"); err == nil {
+				executorValues["lambda"] = cty.StringVal(lambdaArn)
 				g.logger.WithFields(logrus.Fields{
 					"action_group":  resource.Metadata.Name,
-					"lambda_module": lambdaName,
+					"lambda_module": actionGroup.ActionGroupExecutor.Lambda.String(),
 				}).Debug("Using Lambda module reference for action group executor")
 			} else {
 				// Treat as direct ARN reference for backward compatibility
-				executorValues["lambda"] = cty.StringVal(actionGroup.ActionGroupExecutor.Lambda)
+				executorValues["lambda"] = cty.StringVal(actionGroup.ActionGroupExecutor.Lambda.String())
 				g.logger.WithFields(logrus.Fields{
 					"action_group": resource.Metadata.Name,
-					"lambda_value": actionGroup.ActionGroupExecutor.Lambda,
+					"lambda_value": actionGroup.ActionGroupExecutor.Lambda.String(),
 				}).Debug("Using direct Lambda value for action group executor")
 			}
 		}

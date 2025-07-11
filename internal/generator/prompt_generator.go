@@ -320,15 +320,13 @@ func (g *HCLGenerator) generateGenAiResourceConfiguration(genAiConfig *models.Ge
 	if genAiConfig.Agent != nil {
 		agentValues := make(map[string]cty.Value)
 
-		if genAiConfig.Agent.AgentName != "" {
+		if !genAiConfig.Agent.AgentName.IsEmpty() {
 			// Reference to an agent YAML config in the same project
-			if g.registry.HasResource(models.AgentKind, genAiConfig.Agent.AgentName) {
-				agentResourceName := g.sanitizeResourceName(genAiConfig.Agent.AgentName)
-				agentValues["agent_identifier"] = cty.StringVal(fmt.Sprintf("${module.%s.agent_id}", agentResourceName))
-
-				g.logger.WithField("prompt_agent", genAiConfig.Agent.AgentName).Debug("Generated agent reference for prompt variant")
+			if agentId, err := g.resolveReferenceToOutput(genAiConfig.Agent.AgentName, models.AgentKind, "agent_id"); err == nil {
+				agentValues["agent_identifier"] = cty.StringVal(agentId)
+				g.logger.WithField("prompt_agent", genAiConfig.Agent.AgentName.String()).Debug("Generated agent reference for prompt variant")
 			} else {
-				return cty.NilVal, fmt.Errorf("referenced agent '%s' not found in registry", genAiConfig.Agent.AgentName)
+				return cty.NilVal, fmt.Errorf("referenced agent '%s' not found in registry: %w", genAiConfig.Agent.AgentName.String(), err)
 			}
 		} else if genAiConfig.Agent.AgentArn != "" {
 			// Direct ARN reference to an existing deployed agent

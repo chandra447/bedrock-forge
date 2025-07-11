@@ -21,9 +21,9 @@ type AgentSpec struct {
 }
 
 type GuardrailConfig struct {
-	Name    string `yaml:"name"`
-	Version string `yaml:"version,omitempty"`
-	Mode    string `yaml:"mode,omitempty"`
+	Name    Reference `yaml:"name"`
+	Version string    `yaml:"version,omitempty"`
+	Mode    string    `yaml:"mode,omitempty"`
 }
 
 // InlineActionGroup represents an action group defined directly within an agent
@@ -39,11 +39,11 @@ type InlineActionGroup struct {
 }
 
 type PromptOverride struct {
-	PromptType    string `yaml:"promptType"`
-	PromptArn     string `yaml:"promptArn,omitempty"`
-	Prompt        string `yaml:"prompt,omitempty"`
-	PromptVariant string `yaml:"promptVariant,omitempty"`
-	Variant       string `yaml:"variant,omitempty"`
+	PromptType    string    `yaml:"promptType"`
+	PromptArn     string    `yaml:"promptArn,omitempty"` // External ARN
+	Prompt        Reference `yaml:"prompt,omitempty"`    // Reference to Prompt resource
+	PromptVariant string    `yaml:"promptVariant,omitempty"`
+	Variant       string    `yaml:"variant,omitempty"`
 }
 
 type MemoryConfiguration struct {

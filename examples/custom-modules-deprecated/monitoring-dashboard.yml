@@ -10,7 +10,7 @@ spec:
   # Depends on agent and related resources being created
   dependsOn:
     - "customer-support-agent"
-    - "order-lookup-lambda"
+    - "order-lookup"
   
   variables:
     dashboard_name: "BedrockAgentMonitoring-${var.environment}"
@@ -21,8 +21,8 @@ spec:
       - "product-recommendation-agent"
     
     lambda_function_names:
-      - "order-lookup-lambda"
-      - "product-search-lambda"
+      - "order-lookup"
+      - "product-search-api"
     
     # Alert thresholds
     error_rate_threshold: 5.0  # 5% error rate

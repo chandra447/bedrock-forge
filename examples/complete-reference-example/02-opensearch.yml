@@ -1,0 +1,42 @@
+---
+# OpenSearch Serverless collection for vector storage
+kind: OpenSearchServerless
+metadata:
+  name: knowledge-collection
+  description: Vector storage for company knowledge base
+spec:
+  collectionName: "company-knowledge"
+  description: "Vector search collection for customer support knowledge"
+  type: "VECTORSEARCH"
+  
+  # Security policies
+  encryptionPolicy:
+    name: "knowledge-encryption"
+    description: "Encryption policy for knowledge collection"
+    type: "encryption"
+  
+  networkPolicy:
+    name: "knowledge-network"
+    description: "Network access policy for knowledge collection"
+    type: "network"
+    access:
+      - sourceType: "public"
+  
+  accessPolicy:
+    name: "knowledge-access"
+    description: "Access policy for knowledge collection"
+    type: "data"
+    autoConfigureForBedrock: true
+  
+  # Vector index configuration
+  vectorIndex:
+    name: "docs-index"
+    fieldMapping:
+      vectorField: "vector"
+      textField: "text"
+      metadataField: "metadata"
+  
+  tags:
+    Environment: "dev"
+    Purpose: "knowledge-base"
+    Team: "customer-support"

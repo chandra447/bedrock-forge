@@ -167,6 +167,13 @@ func (p *YAMLParser) parseDocument(content []byte, filePath string, docIndex int
 		}
 		parsedResource.Resource = &opensearchServerless
 
+	case models.AgentKnowledgeBaseAssociationKind:
+		var association models.AgentKnowledgeBaseAssociation
+		if err := yaml.Unmarshal(content, &association); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal AgentKnowledgeBaseAssociation: %w", err)
+		}
+		parsedResource.Resource = &association
+
 	default:
 		return nil, fmt.Errorf("unsupported resource kind: %s", base.Kind)
 	}
@@ -204,6 +211,38 @@ func (p *YAMLParser) ValidateResource(resource *ParsedResource) error {
 		return p.validateCustomModule(resource.Resource.(*models.CustomModule))
 	case models.OpenSearchServerlessKind:
 		return p.validateOpenSearchServerless(resource.Resource.(*models.OpenSearchServerless))
+	case models.AgentKnowledgeBaseAssociationKind:
+		return p.validateAgentKnowledgeBaseAssociation(resource.Resource.(*models.AgentKnowledgeBaseAssociation))
+	}
+
+	return nil
+}
+
+// validateReference validates a Reference field
+func (p *YAMLParser) validateReference(ref models.Reference, fieldName string) error {
+	if ref.IsEmpty() {
+		return fmt.Errorf("%s reference is required", fieldName)
+	}
+
+	// Basic validation for reference name
+	refName := ref.String()
+	if refName == "" {
+		return fmt.Errorf("%s reference name cannot be empty", fieldName)
+	}
+
+	return nil
+}
+
+// validateOptionalReference validates an optional Reference field
+func (p *YAMLParser) validateOptionalReference(ref models.Reference, fieldName string) error {
+	if ref.IsEmpty() {
+		return nil // Optional reference can be empty
+	}
+
+	// Basic validation for reference name
+	refName := ref.String()
+	if refName == "" {
+		return fmt.Errorf("%s reference name cannot be empty when specified", fieldName)
 	}
 
 	return nil
@@ -216,6 +255,30 @@ func (p *YAMLParser) validateAgent(agent *models.Agent) error {
 	if agent.Spec.Instruction == "" {
 		return fmt.Errorf("agent instruction is required")
 	}
+
+	// Validate guardrail reference
+	if agent.Spec.Guardrail != nil {
+		if err := p.validateOptionalReference(agent.Spec.Guardrail.Name, "guardrail"); err != nil {
+			return err
+		}
+	}
+
+	// Validate prompt override references
+	for i, promptOverride := range agent.Spec.PromptOverrides {
+		if err := p.validateOptionalReference(promptOverride.Prompt, fmt.Sprintf("prompt override[%d]", i)); err != nil {
+			return err
+		}
+	}
+
+	// Validate inline action group lambda references
+	for i, actionGroup := range agent.Spec.ActionGroups {
+		if actionGroup.ActionGroupExecutor != nil {
+			if err := p.validateOptionalReference(actionGroup.ActionGroupExecutor.Lambda, fmt.Sprintf("action group[%d] lambda", i)); err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -236,6 +299,17 @@ func (p *YAMLParser) validateActionGroup(actionGroup *models.ActionGroup) error 
 	if actionGroup.Spec.ActionGroupExecutor == nil {
 		return fmt.Errorf("actionGroup executor is required")
 	}
+
+	// Validate agent reference
+	if err := p.validateReference(actionGroup.Spec.AgentId, "agent"); err != nil {
+		return err
+	}
+
+	// Validate lambda reference
+	if err := p.validateOptionalReference(actionGroup.Spec.ActionGroupExecutor.Lambda, "lambda"); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -313,5 +387,19 @@ func (p *YAMLParser) validateOpenSearchServerless(opensearchServerless *models.O
 	if opensearchServerless.Spec.CollectionName == "" {
 		return fmt.Errorf("OpenSearch Serverless collectionName is required")
 	}
+	return nil
+}
+
+func (p *YAMLParser) validateAgentKnowledgeBaseAssociation(association *models.AgentKnowledgeBaseAssociation) error {
+	// Validate agent reference
+	if err := p.validateReference(association.Spec.AgentName, "agent"); err != nil {
+		return err
+	}
+
+	// Validate knowledge base reference
+	if err := p.validateReference(association.Spec.KnowledgeBaseName, "knowledge base"); err != nil {
+		return err
+	}
+
 	return nil
 }

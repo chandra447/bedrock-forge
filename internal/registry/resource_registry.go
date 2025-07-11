@@ -137,8 +137,8 @@ func (r *ResourceRegistry) ValidateDependencies() []error {
 	for _, agentResource := range agents {
 		agent := agentResource.Resource.(*models.Agent)
 
-		if agent.Spec.Guardrail != nil {
-			guardrailName := agent.Spec.Guardrail.Name
+		if agent.Spec.Guardrail != nil && !agent.Spec.Guardrail.Name.IsEmpty() {
+			guardrailName := agent.Spec.Guardrail.Name.String()
 			if _, exists := r.resources[models.GuardrailKind][guardrailName]; !exists {
 				errors = append(errors, fmt.Errorf("agent %s references non-existent guardrail %s", agent.Metadata.Name, guardrailName))
 			}
@@ -150,9 +150,10 @@ func (r *ResourceRegistry) ValidateDependencies() []error {
 		for _, ag := range agent.Spec.ActionGroups {
 			// Validate Lambda references for action group executors
 			if ag.ActionGroupExecutor != nil {
-				if ag.ActionGroupExecutor.Lambda != "" {
-					if _, exists := r.resources[models.LambdaKind][ag.ActionGroupExecutor.Lambda]; !exists {
-						errors = append(errors, fmt.Errorf("agent %s action group %s references non-existent lambda %s", agent.Metadata.Name, ag.Name, ag.ActionGroupExecutor.Lambda))
+				if !ag.ActionGroupExecutor.Lambda.IsEmpty() {
+					lambdaName := ag.ActionGroupExecutor.Lambda.String()
+					if _, exists := r.resources[models.LambdaKind][lambdaName]; !exists {
+						errors = append(errors, fmt.Errorf("agent %s action group %s references non-existent lambda %s", agent.Metadata.Name, ag.Name, lambdaName))
 					}
 				}
 				// LambdaArn references are external and don't need validation
@@ -160,9 +161,10 @@ func (r *ResourceRegistry) ValidateDependencies() []error {
 		}
 
 		for _, promptOverride := range agent.Spec.PromptOverrides {
-			if promptOverride.Prompt != "" {
-				if _, exists := r.resources[models.PromptKind][promptOverride.Prompt]; !exists {
-					errors = append(errors, fmt.Errorf("agent %s references non-existent prompt %s", agent.Metadata.Name, promptOverride.Prompt))
+			if !promptOverride.Prompt.IsEmpty() {
+				promptName := promptOverride.Prompt.String()
+				if _, exists := r.resources[models.PromptKind][promptName]; !exists {
+					errors = append(errors, fmt.Errorf("agent %s references non-existent prompt %s", agent.Metadata.Name, promptName))
 				}
 			}
 		}
@@ -183,8 +185,8 @@ func (r *ResourceRegistry) ValidateDependencies() []error {
 			}
 
 			// If lambda name is specified, validate it exists in the registry
-			if actionGroup.Spec.ActionGroupExecutor.Lambda != "" {
-				lambdaName := actionGroup.Spec.ActionGroupExecutor.Lambda
+			if !actionGroup.Spec.ActionGroupExecutor.Lambda.IsEmpty() {
+				lambdaName := actionGroup.Spec.ActionGroupExecutor.Lambda.String()
 				if _, exists := r.resources[models.LambdaKind][lambdaName]; !exists {
 					errors = append(errors, fmt.Errorf("action group %s references non-existent lambda %s", actionGroup.Metadata.Name, lambdaName))
 				}
@@ -198,7 +200,11 @@ func (r *ResourceRegistry) ValidateDependencies() []error {
 		customModule := cmResource.Resource.(*models.CustomModule)
 
 		// Validate dependsOn references
-		for _, dep := range customModule.Spec.DependsOn {
+		for _, depRef := range customModule.Spec.DependsOn {
+			if depRef.IsEmpty() {
+				continue
+			}
+			depName := depRef.String()
 			found := false
 			// Check all resource types for the dependency
 			resourceTypes := []models.ResourceKind{
@@ -214,14 +220,14 @@ func (r *ResourceRegistry) ValidateDependencies() []error {
 			}
 
 			for _, resourceType := range resourceTypes {
-				if _, exists := r.resources[resourceType][dep]; exists {
+				if _, exists := r.resources[resourceType][depName]; exists {
 					found = true
 					break
 				}
 			}
 
 			if !found {
-				errors = append(errors, fmt.Errorf("custom module %s references non-existent dependency %s", customModule.Metadata.Name, dep))
+				errors = append(errors, fmt.Errorf("custom module %s references non-existent dependency %s", customModule.Metadata.Name, depName))
 			}
 		}
 	}

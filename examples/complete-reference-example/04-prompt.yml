@@ -1,0 +1,82 @@
+---
+# Custom orchestration prompt for the agent
+kind: Prompt
+metadata:
+  name: customer-support-orchestration
+  description: Custom orchestration prompt for customer support agent
+spec:
+  description: "Enhanced orchestration prompt with function calling capabilities"
+  defaultVariant: "customer-support-v1"
+  
+  # Global input variables
+  inputVariables:
+    - name: "customer_context"
+    - name: "interaction_type"
+  
+  variants:
+    - name: "customer-support-v1"
+      modelId: "anthropic.claude-3-sonnet-20240229-v1:0"
+      templateType: "CHAT"
+      
+      templateConfiguration:
+        chat:
+          system:
+            - text: |
+                You are a helpful customer support agent for an e-commerce company.
+                You have access to order lookup and product search functions.
+                
+                Guidelines:
+                - Always be polite and professional
+                - Use the available functions to provide accurate information
+                - If you cannot find specific information, explain what you searched for
+                - Prioritize customer satisfaction while following company policies
+                
+                Customer Context: {{customer_context}}
+                Interaction Type: {{interaction_type}}
+          
+          inputVariables:
+            - name: "customer_context"
+            - name: "interaction_type"
+          
+          toolConfiguration:
+            tools:
+              - toolSpec:
+                  name: "lookup_order"
+                  description: "Look up customer order details by order ID"
+                  inputSchema:
+                    json:
+                      type: "object"
+                      properties:
+                        order_id:
+                          type: "string"
+                          description: "The order ID to look up"
+                      required: ["order_id"]
+              
+              - toolSpec:
+                  name: "search_products"
+                  description: "Search for products by name, category, or features"
+                  inputSchema:
+                    json:
+                      type: "object"
+                      properties:
+                        query:
+                          type: "string"
+                          description: "Search query for products"
+                        category:
+                          type: "string"
+                          description: "Product category filter (optional)"
+                      required: ["query"]
+            
+            toolChoice:
+              auto: {}
+      
+      inferenceConfiguration:
+        text:
+          temperature: 0.1
+          topP: 0.9
+          maxTokens: 2048
+  
+  tags:
+    Environment: "dev"
+    Purpose: "orchestration"
+    Team: "customer-support"

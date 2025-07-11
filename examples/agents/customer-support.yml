@@ -9,20 +9,19 @@ spec:
   idleSessionTtlInSeconds: 3600
   
   guardrail:
-    name: "content-safety-guardrail"
+    name: {ref: content-safety-guardrail}
     version: "1"
     mode: "pre"
   
-  knowledgeBases: 
-    - name: "faq-kb"
-      description: "Customer FAQ knowledge base"
+  # Knowledge bases are now linked via AgentKnowledgeBaseAssociation resources
+  # See examples/complete-reference-example/08-association.yml
   
   promptOverrides:
     - promptType: "PRE_PROCESSING"
       promptArn: "arn:aws:bedrock:us-east-1:123456789012:prompt/custom-preprocessing"
       promptVariant: "v1"
     - promptType: "ORCHESTRATION"
-      prompt: "custom-orchestration-prompt"
+      prompt: {ref: custom-orchestration-prompt}
       variant: "production"
   
   memoryConfiguration:
@@ -86,3 +85,37 @@ spec:
       - text: "competitor_name"
     managedWordListsConfig:
       - type: "PROFANITY"
+
+---
+kind: Prompt
+metadata:
+  name: "custom-orchestration-prompt"
+  description: "Custom orchestration prompt for customer support"
+spec:
+  description: "Enhanced orchestration for customer support agent"
+  defaultVariant: "production"
+  
+  variants:
+    - name: "production"
+      modelId: "anthropic.claude-3-sonnet-20240229-v1:0"
+      templateType: "TEXT"
+      
+      templateConfiguration:
+        text:
+          text: |
+            You are a professional customer support agent.
+            Always be helpful and courteous in your responses.
+            Use available tools to assist customers effectively.
+            
+            Customer Query: {{user_query}}
+            
+            Please provide a helpful response.
+          
+          inputVariables:
+            - name: "user_query"
+      
+      inferenceConfiguration:
+        text:
+          temperature: 0.1
+          topP: 0.9
+          maxTokens: 1024

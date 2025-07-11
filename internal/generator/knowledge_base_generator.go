@@ -96,10 +96,16 @@ func (g *HCLGenerator) generateKnowledgeBaseModule(body *hclwrite.Body, resource
 			if osConfig.CollectionArn != nil {
 				// Use existing collection ARN
 				osValues["collection_arn"] = cty.StringVal(*osConfig.CollectionArn)
-			} else if osConfig.CollectionName != nil {
+			} else if osConfig.CollectionName != nil && !osConfig.CollectionName.IsEmpty() {
 				// Reference auto-created collection by name
-				collectionResourceName := g.sanitizeResourceName(*osConfig.CollectionName)
-				osValues["collection_arn"] = cty.StringVal(fmt.Sprintf("${aws_opensearchserverless_collection.%s.arn}", collectionResourceName))
+				if collectionArn, err := g.resolveReferenceToOutput(*osConfig.CollectionName, models.OpenSearchServerlessKind, "collection_arn"); err == nil {
+					osValues["collection_arn"] = cty.StringVal(collectionArn)
+				} else {
+					// Fallback to direct reference for backward compatibility
+					collectionResourceName := g.sanitizeResourceName(osConfig.CollectionName.String())
+					osValues["collection_arn"] = cty.StringVal(fmt.Sprintf("${aws_opensearchserverless_collection.%s.arn}", collectionResourceName))
+					g.logger.WithError(err).WithField("collection", osConfig.CollectionName.String()).Warn("Failed to resolve OpenSearch Serverless collection reference")
+				}
 			}
 
 			osValues["vector_index_name"] = cty.StringVal(osConfig.VectorIndexName)

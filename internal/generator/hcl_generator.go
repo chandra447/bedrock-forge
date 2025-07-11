@@ -1,6 +1,7 @@
 package generator
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -99,26 +100,236 @@ func (g *HCLGenerator) Generate() error {
 
 // buildDependencyOrder determines the order in which resources should be created
 func (g *HCLGenerator) buildDependencyOrder() ([]models.ResourceKind, error) {
-	// Define the dependency order based on Bedrock resource relationships
-	// Guardrails and Prompts can be created first (no dependencies)
-	// KnowledgeBases and Lambdas can be created next
-	// ActionGroups depend on Lambdas
-	// Agents depend on everything else
+	// Build dependency graph based on actual references
+	dependencyGraph := g.buildDependencyGraph()
 
-	order := []models.ResourceKind{
-		models.IAMRoleKind,         // IAM roles must be created first
-		models.CustomResourcesKind, // Custom resources (user .tf files) can be created early
-		models.CustomModuleKind,    // Custom modules can be created early (deprecated)
+	// Perform topological sort to determine order
+	orderedKinds, err := g.topologicalSort(dependencyGraph)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve dependencies: %w", err)
+	}
+
+	return orderedKinds, nil
+}
+
+// buildDependencyGraph analyzes all resources and builds a dependency graph
+func (g *HCLGenerator) buildDependencyGraph() map[models.ResourceKind][]models.ResourceKind {
+	dependencies := make(map[models.ResourceKind][]models.ResourceKind)
+
+	// Initialize all resource kinds
+	allKinds := []models.ResourceKind{
+		models.IAMRoleKind,
+		models.CustomResourcesKind,
+		models.CustomModuleKind,
 		models.GuardrailKind,
 		models.PromptKind,
 		models.LambdaKind,
-		models.OpenSearchServerlessKind, // OpenSearch Serverless must be created before KnowledgeBase
+		models.OpenSearchServerlessKind,
 		models.KnowledgeBaseKind,
 		models.ActionGroupKind,
+		models.AgentKnowledgeBaseAssociationKind,
 		models.AgentKind,
 	}
 
-	return order, nil
+	for _, kind := range allKinds {
+		dependencies[kind] = []models.ResourceKind{}
+	}
+
+	// Analyze dependencies for each resource kind
+	for _, kind := range allKinds {
+		resources := g.registry.GetResourcesByType(kind)
+		for _, resource := range resources {
+			resourceDeps := g.extractResourceDependencies(resource)
+			for _, dep := range resourceDeps {
+				if !g.containsKind(dependencies[kind], dep) {
+					dependencies[kind] = append(dependencies[kind], dep)
+				}
+			}
+		}
+	}
+
+	return dependencies
+}
+
+// extractResourceDependencies analyzes a resource and extracts its dependencies
+func (g *HCLGenerator) extractResourceDependencies(resource models.BaseResource) []models.ResourceKind {
+	var dependencies []models.ResourceKind
+
+	switch resource.Kind {
+	case models.AgentKind:
+		// Agent depends on guardrails, prompts, and lambdas
+		if agent, ok := resource.Spec.(models.AgentSpec); ok {
+			if agent.Guardrail != nil && !agent.Guardrail.Name.IsEmpty() {
+				dependencies = append(dependencies, models.GuardrailKind)
+			}
+
+			for _, promptOverride := range agent.PromptOverrides {
+				if !promptOverride.Prompt.IsEmpty() {
+					dependencies = append(dependencies, models.PromptKind)
+				}
+			}
+
+			for _, ag := range agent.ActionGroups {
+				if ag.ActionGroupExecutor != nil && !ag.ActionGroupExecutor.Lambda.IsEmpty() {
+					dependencies = append(dependencies, models.LambdaKind)
+				}
+			}
+		}
+
+	case models.ActionGroupKind:
+		// ActionGroup depends on agent and lambda
+		if actionGroup, ok := resource.Spec.(models.ActionGroupSpec); ok {
+			if !actionGroup.AgentId.IsEmpty() {
+				dependencies = append(dependencies, models.AgentKind)
+			}
+
+			if actionGroup.ActionGroupExecutor != nil && !actionGroup.ActionGroupExecutor.Lambda.IsEmpty() {
+				dependencies = append(dependencies, models.LambdaKind)
+			}
+		}
+
+	case models.KnowledgeBaseKind:
+		// KnowledgeBase depends on OpenSearch Serverless and optionally Lambda
+		if knowledgeBase, ok := resource.Spec.(models.KnowledgeBaseSpec); ok {
+			if knowledgeBase.StorageConfiguration != nil && knowledgeBase.StorageConfiguration.OpenSearchServerless != nil {
+				if knowledgeBase.StorageConfiguration.OpenSearchServerless.CollectionName != nil && !knowledgeBase.StorageConfiguration.OpenSearchServerless.CollectionName.IsEmpty() {
+					dependencies = append(dependencies, models.OpenSearchServerlessKind)
+				}
+			}
+
+			for _, dataSource := range knowledgeBase.DataSources {
+				if dataSource.CustomTransformation != nil && dataSource.CustomTransformation.TransformationLambda != nil {
+					if !dataSource.CustomTransformation.TransformationLambda.Lambda.IsEmpty() {
+						dependencies = append(dependencies, models.LambdaKind)
+					}
+				}
+			}
+		}
+
+	case models.AgentKnowledgeBaseAssociationKind:
+		// Association depends on agent and knowledge base
+		if association, ok := resource.Spec.(models.AgentKnowledgeBaseAssociationSpec); ok {
+			if !association.AgentName.IsEmpty() {
+				dependencies = append(dependencies, models.AgentKind)
+			}
+
+			if !association.KnowledgeBaseName.IsEmpty() {
+				dependencies = append(dependencies, models.KnowledgeBaseKind)
+			}
+		}
+
+	case models.CustomResourcesKind:
+		// Custom resources depend on their dependencies
+		if customResources, ok := resource.Spec.(models.CustomResourcesSpec); ok {
+			for _, depRef := range customResources.DependsOn {
+				if !depRef.IsEmpty() {
+					// Determine the kind of the dependency
+					if depKind := g.getResourceKindByName(depRef.String()); depKind != "" {
+						dependencies = append(dependencies, depKind)
+					}
+				}
+			}
+		}
+
+	case models.CustomModuleKind:
+		// Custom module depends on its dependencies
+		if customModule, ok := resource.Spec.(models.CustomModuleSpec); ok {
+			for _, depRef := range customModule.DependsOn {
+				if !depRef.IsEmpty() {
+					// Determine the kind of the dependency
+					if depKind := g.getResourceKindByName(depRef.String()); depKind != "" {
+						dependencies = append(dependencies, depKind)
+					}
+				}
+			}
+		}
+	}
+
+	return dependencies
+}
+
+// getResourceKindByName finds the resource kind for a given resource name
+func (g *HCLGenerator) getResourceKindByName(resourceName string) models.ResourceKind {
+	allKinds := []models.ResourceKind{
+		models.IAMRoleKind,
+		models.CustomResourcesKind,
+		models.CustomModuleKind,
+		models.GuardrailKind,
+		models.PromptKind,
+		models.LambdaKind,
+		models.OpenSearchServerlessKind,
+		models.KnowledgeBaseKind,
+		models.ActionGroupKind,
+		models.AgentKnowledgeBaseAssociationKind,
+		models.AgentKind,
+	}
+
+	for _, kind := range allKinds {
+		if g.registry.HasResource(kind, resourceName) {
+			return kind
+		}
+	}
+
+	return ""
+}
+
+// containsKind checks if a kind is already in the slice
+func (g *HCLGenerator) containsKind(kinds []models.ResourceKind, kind models.ResourceKind) bool {
+	for _, k := range kinds {
+		if k == kind {
+			return true
+		}
+	}
+	return false
+}
+
+// topologicalSort performs a topological sort on the dependency graph
+func (g *HCLGenerator) topologicalSort(graph map[models.ResourceKind][]models.ResourceKind) ([]models.ResourceKind, error) {
+	// Kahn's algorithm for topological sorting
+	inDegree := make(map[models.ResourceKind]int)
+	queue := []models.ResourceKind{}
+	result := []models.ResourceKind{}
+
+	// Initialize in-degree count
+	for kind := range graph {
+		inDegree[kind] = 0
+	}
+
+	// Calculate in-degrees
+	for _, dependencies := range graph {
+		for _, dep := range dependencies {
+			inDegree[dep]++
+		}
+	}
+
+	// Find all nodes with in-degree 0
+	for kind, degree := range inDegree {
+		if degree == 0 {
+			queue = append(queue, kind)
+		}
+	}
+
+	// Process nodes
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+		result = append(result, current)
+
+		// Reduce in-degree for all dependent nodes
+		for _, dep := range graph[current] {
+			inDegree[dep]--
+			if inDegree[dep] == 0 {
+				queue = append(queue, dep)
+			}
+		}
+	}
+
+	// Check for cycles
+	if len(result) != len(graph) {
+		return nil, fmt.Errorf("circular dependency detected")
+	}
+
+	return result, nil
 }
 
 // generateModuleCall creates a module call for a specific resource
@@ -144,6 +355,8 @@ func (g *HCLGenerator) generateModuleCall(body *hclwrite.Body, resource models.B
 		return g.generateCustomModuleModule(body, resource)
 	case models.OpenSearchServerlessKind:
 		return g.generateOpenSearchServerlessModule(body, resource)
+	case models.AgentKnowledgeBaseAssociationKind:
+		return g.generateAgentKnowledgeBaseAssociationModule(body, resource)
 	default:
 		return fmt.Errorf("unsupported resource kind: %s", resource.Kind)
 	}
@@ -275,6 +488,44 @@ func (g *HCLGenerator) writeFile(path string, content []byte) error {
 	return os.WriteFile(path, content, 0644)
 }
 
+// resolveReference resolves a Reference to a resource name and module reference
+func (g *HCLGenerator) resolveReference(ref models.Reference, expectedKind models.ResourceKind) (string, string, error) {
+	if ref.IsEmpty() {
+		return "", "", fmt.Errorf("empty reference")
+	}
+
+	resourceName := ref.String()
+
+	// Check if the resource exists in the registry
+	if !g.registry.HasResource(expectedKind, resourceName) {
+		return "", "", fmt.Errorf("resource %s of kind %s not found in registry", resourceName, expectedKind)
+	}
+
+	// Return the resource name and module reference
+	sanitizedName := g.sanitizeResourceName(resourceName)
+	moduleRef := fmt.Sprintf("${module.%s}", sanitizedName)
+
+	return resourceName, moduleRef, nil
+}
+
+// resolveReferenceToOutput resolves a Reference to a specific module output
+func (g *HCLGenerator) resolveReferenceToOutput(ref models.Reference, expectedKind models.ResourceKind, outputName string) (string, error) {
+	if ref.IsEmpty() {
+		return "", fmt.Errorf("empty reference")
+	}
+
+	resourceName := ref.String()
+
+	// Check if the resource exists in the registry
+	if !g.registry.HasResource(expectedKind, resourceName) {
+		return "", fmt.Errorf("resource %s of kind %s not found in registry", resourceName, expectedKind)
+	}
+
+	// Return the module output reference
+	sanitizedName := g.sanitizeResourceName(resourceName)
+	return fmt.Sprintf("${module.%s.%s}", sanitizedName, outputName), nil
+}
+
 // generateAutoIAMRoles generates IAM roles for all agents automatically
 func (g *HCLGenerator) generateAutoIAMRoles(body *hclwrite.Body) {
 	agents := g.registry.GetResourcesByType(models.AgentKind)
@@ -285,4 +536,71 @@ func (g *HCLGenerator) generateAutoIAMRoles(body *hclwrite.Body) {
 			g.logger.WithError(err).WithField("agent", agentResource.Metadata.Name).Warn("Failed to generate auto IAM role")
 		}
 	}
+}
+
+// generateAgentKnowledgeBaseAssociationModule creates a module call for an AgentKnowledgeBaseAssociation resource
+func (g *HCLGenerator) generateAgentKnowledgeBaseAssociationModule(body *hclwrite.Body, resource models.BaseResource) error {
+	association, ok := resource.Spec.(models.AgentKnowledgeBaseAssociationSpec)
+	if !ok {
+		// Try to parse as map and convert to AgentKnowledgeBaseAssociationSpec
+		specMap, mapOk := resource.Spec.(map[string]interface{})
+		if !mapOk {
+			return fmt.Errorf("invalid agent knowledge base association spec format")
+		}
+
+		// Convert map to AgentKnowledgeBaseAssociationSpec
+		specJSON, err := json.Marshal(specMap)
+		if err != nil {
+			return fmt.Errorf("failed to marshal association spec: %w", err)
+		}
+
+		if err := json.Unmarshal(specJSON, &association); err != nil {
+			return fmt.Errorf("failed to unmarshal association spec: %w", err)
+		}
+	}
+
+	resourceName := g.sanitizeResourceName(resource.Metadata.Name)
+
+	// Create module block
+	moduleBlock := body.AppendNewBlock("module", []string{resourceName})
+	moduleBody := moduleBlock.Body()
+
+	// Set module source
+	moduleSource := fmt.Sprintf("%s//modules/bedrock-agent-knowledge-base-association", g.config.ModuleRegistry)
+	if g.config.ModuleVersion != "" {
+		moduleSource += fmt.Sprintf("?ref=%s", g.config.ModuleVersion)
+	}
+	moduleBody.SetAttributeValue("source", cty.StringVal(moduleSource))
+
+	// Set basic attributes
+	moduleBody.SetAttributeValue("association_name", cty.StringVal(resource.Metadata.Name))
+
+	// Resolve agent reference
+	if agentId, err := g.resolveReferenceToOutput(association.AgentName, models.AgentKind, "agent_id"); err == nil {
+		moduleBody.SetAttributeValue("agent_id", cty.StringVal(agentId))
+	} else {
+		return fmt.Errorf("failed to resolve agent reference: %w", err)
+	}
+
+	// Resolve knowledge base reference
+	if kbId, err := g.resolveReferenceToOutput(association.KnowledgeBaseName, models.KnowledgeBaseKind, "knowledge_base_id"); err == nil {
+		moduleBody.SetAttributeValue("knowledge_base_id", cty.StringVal(kbId))
+	} else {
+		return fmt.Errorf("failed to resolve knowledge base reference: %w", err)
+	}
+
+	// Optional description
+	if association.Description != "" {
+		moduleBody.SetAttributeValue("description", cty.StringVal(association.Description))
+	}
+
+	// Optional state
+	if association.State != "" {
+		moduleBody.SetAttributeValue("state", cty.StringVal(association.State))
+	}
+
+	body.AppendNewline()
+
+	g.logger.WithField("association", resource.Metadata.Name).Info("Generated agent knowledge base association module")
+	return nil
 }

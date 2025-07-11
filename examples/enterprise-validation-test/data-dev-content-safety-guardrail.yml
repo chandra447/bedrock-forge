@@ -1,0 +1,62 @@
+# Content safety guardrail for data team development environment
+kind: Guardrail
+metadata:
+  name: "data-dev-content-safety-guardrail"
+  description: "Content safety guardrail for data team development environment"
+spec:
+  description: "Enterprise content safety policies for customer support agents in data team development"
+  
+  contentPolicyConfig:
+    filtersConfig:
+      - type: "SEXUAL"
+        inputStrength: "HIGH"
+        outputStrength: "HIGH"
+      - type: "VIOLENCE"
+        inputStrength: "HIGH"
+        outputStrength: "HIGH"
+      - type: "HATE"
+        inputStrength: "MEDIUM"
+        outputStrength: "MEDIUM"
+      - type: "INSULTS"
+        inputStrength: "MEDIUM"
+        outputStrength: "MEDIUM"
+      - type: "MISCONDUCT"
+        inputStrength: "MEDIUM"
+        outputStrength: "MEDIUM"
+  
+  sensitiveInformationPolicyConfig:
+    piiEntitiesConfig:
+      - type: "EMAIL"
+        action: "ANONYMIZE"
+      - type: "PHONE"
+        action: "ANONYMIZE"
+      - type: "SSN"
+        action: "BLOCK"
+      - type: "CREDIT_DEBIT_CARD_NUMBER"
+        action: "BLOCK"
+      - type: "ADDRESS"
+        action: "ANONYMIZE"
+      - type: "NAME"
+        action: "ANONYMIZE"
+  
+  wordPolicyConfig:
+    wordsConfig:
+      - text: "confidential"
+      - text: "internal"
+      - text: "restricted"
+    managedWordListsConfig:
+      - type: "PROFANITY"
+  
+  tags:
+    Environment: "dev"
+    Project: "customer-support-platform"
+    Owner: "john.doe@company.com"
+    CostCenter: "CC-1234"
+    Team: "data"
+    BusinessUnit: "engineering"
+    DataClassification: "internal"
+    ComplianceLevel: "high"
+    AgentType: "safety-guardrail"
+    BusinessFunction: "security"
+    DataProcessing: "content-filtering"
+    SecurityLevel: "high"

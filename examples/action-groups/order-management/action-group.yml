@@ -3,14 +3,14 @@ metadata:
   name: "order-management"
   description: "Action group for order management operations"
 spec:
-  # Required: Agent ID (use module reference or direct ARN)
-  agentId: "${module.customer_support.agent_id}"  # Reference to local agent module
+  # Required: Agent ID using new reference syntax
+  agentId: {ref: customer-support}  # Reference to Agent resource
   # Optional: Agent version (defaults to DRAFT)
   agentVersion: "DRAFT"
   description: "Provides order lookup and management capabilities"
   # Required: Action group executor
   actionGroupExecutor:
-    lambda: "order-lookup"  # References the Lambda function defined in same project
+    lambda: {ref: order-lookup}  # Reference to Lambda resource using object syntax
   apiSchema:
     s3:
       s3BucketName: "bedrock-schemas"

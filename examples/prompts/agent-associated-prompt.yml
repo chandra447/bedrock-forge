@@ -20,7 +20,7 @@ spec:
       # Associate this prompt variant with an agent
       genAiResource:
         agent:
-          agentName: "customer-support"  # Reference to agent YAML in same project
+          agentName: {ref: customer-support}  # Reference to Agent resource using object syntax
       
       templateConfiguration:
         text:

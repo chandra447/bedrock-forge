@@ -112,13 +112,15 @@ func (g *HCLGenerator) generateCustomModuleModule(body *hclwrite.Body, resource 
 	// Add dependency references if specified
 	if len(customModule.DependsOn) > 0 {
 		dependsList := make([]cty.Value, 0, len(customModule.DependsOn))
-		for _, dep := range customModule.DependsOn {
-			// Check if dependency exists in registry and create proper reference
-			if g.isValidDependency(dep) {
-				depName := g.sanitizeResourceName(dep)
-				dependsList = append(dependsList, cty.StringVal(fmt.Sprintf("module.%s", depName)))
-			} else {
-				g.logger.WithField("dependency", dep).Warn("Invalid dependency reference in custom module")
+		for _, depRef := range customModule.DependsOn {
+			if !depRef.IsEmpty() {
+				// Check if dependency exists in registry and create proper reference
+				if g.isValidDependency(depRef.String()) {
+					depName := g.sanitizeResourceName(depRef.String())
+					dependsList = append(dependsList, cty.StringVal(fmt.Sprintf("module.%s", depName)))
+				} else {
+					g.logger.WithField("dependency", depRef.String()).Warn("Invalid dependency reference in custom module")
+				}
 			}
 		}
 		if len(dependsList) > 0 {

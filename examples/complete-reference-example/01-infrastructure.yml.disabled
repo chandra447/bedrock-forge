@@ -1,0 +1,16 @@
+---
+# Custom infrastructure using user's own Terraform files
+kind: CustomResources
+metadata:
+  name: notification-infrastructure
+  description: SNS topic and EventBridge rules for agent notifications
+spec:
+  # Use path instead of files for this example
+  path: "./terraform/"
+  
+  variables:
+    sns_topic_name: "customer-support-notifications"
+    environment: "dev"
+    agent_name_prefix: "customer-support"
+  
+  description: "SNS and EventBridge infrastructure for agent notifications"

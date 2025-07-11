@@ -1,0 +1,154 @@
+---
+# Simple agent demonstrating the new reference syntax
+kind: Agent
+metadata:
+  name: simple-customer-support-agent
+  description: AI-powered customer support agent showcasing new reference syntax
+spec:
+  foundationModel: "anthropic.claude-3-sonnet-20240229-v1:0"
+  instruction: |
+    You are a helpful and professional customer support agent.
+    You can help customers with their inquiries and provide assistance.
+  
+  description: "Customer support agent with reference examples"
+  idleSessionTtl: 3600
+  
+  # Guardrail reference using object syntax (recommended)
+  guardrail:
+    name: {ref: simple-customer-support-safety}  # Object reference syntax
+    version: "DRAFT"
+    mode: "GUARDRAILS_ONLY"
+  
+  # Simple action group with lambda reference
+  actionGroups:
+    - name: "order-management"
+      description: "Order lookup capabilities"
+      actionGroupExecutor:
+        lambda: {ref: simple-order-lookup-function}  # Object reference syntax
+      functionSchema:
+        functions:
+          - name: "lookup_order"
+            description: "Look up customer order details"
+            parameters:
+              order_id:
+                description: "The order ID to look up"
+                required: true
+                type: "string"
+  
+  # Prompt override using object reference syntax
+  promptOverrides:
+    - promptType: "ORCHESTRATION"
+      prompt: {ref: simple-customer-support-orchestration}  # Object reference syntax
+      variant: "customer-support-v1"
+  
+  # Memory configuration
+  memoryConfiguration:
+    enabledMemoryTypes: ["SESSION_SUMMARY"]
+    storageDays: 30
+  
+  tags:
+    Environment: "dev"
+    Purpose: "customer-support"
+    ReferenceSyntax: "object-demo"
+
+---
+# Guardrail resource referenced by the agent
+kind: Guardrail
+metadata:
+  name: simple-customer-support-safety
+  description: Content safety for customer support
+spec:
+  description: "Content safety policies for customer support agent"
+  
+  contentPolicyConfig:
+    filtersConfig:
+      - type: "SEXUAL"
+        inputStrength: "HIGH"
+        outputStrength: "HIGH"
+      - type: "VIOLENCE"
+        inputStrength: "HIGH"
+        outputStrength: "HIGH"
+  
+  sensitiveInformationPolicyConfig:
+    piiEntitiesConfig:
+      - type: "EMAIL"
+        action: "ANONYMIZE"
+      - type: "PHONE"
+        action: "ANONYMIZE"
+  
+  tags:
+    Environment: "dev"
+    Purpose: "content-safety"
+
+---
+# Lambda function referenced by the agent
+kind: Lambda
+metadata:
+  name: simple-order-lookup-function
+  description: Lambda function for order lookup
+spec:
+  runtime: "python3.9"
+  handler: "app.handler"
+  timeout: 30
+  memorySize: 256
+  
+  code:
+    source: "zip"
+    zipFile: |
+      import json
+      
+      def handler(event, context):
+          order_id = event.get('order_id', 'unknown')
+          return {
+              'statusCode': 200,
+              'body': json.dumps({
+                  'order_id': order_id,
+                  'status': 'found',
+                  'message': f'Order {order_id} details retrieved'
+              })
+          }
+  
+  environment:
+    LOG_LEVEL: "INFO"
+  
+  tags:
+    Environment: "dev"
+    Purpose: "order-lookup"
+
+---
+# Prompt template referenced by the agent
+kind: Prompt
+metadata:
+  name: simple-customer-support-orchestration
+  description: Custom orchestration prompt
+spec:
+  description: "Enhanced orchestration for customer support"
+  defaultVariant: "customer-support-v1"
+  
+  variants:
+    - name: "customer-support-v1"
+      modelId: "anthropic.claude-3-sonnet-20240229-v1:0"
+      templateType: "TEXT"
+      
+      templateConfiguration:
+        text:
+          text: |
+            You are a professional customer support agent.
+            Always be helpful and courteous in your responses.
+            
+            Customer Query: {{user_query}}
+            
+            Please provide a helpful response.
+          
+          inputVariables:
+            - name: "user_query"
+      
+      inferenceConfiguration:
+        text:
+          temperature: 0.1
+          topP: 0.9
+          maxTokens: 1024
+  
+  tags:
+    Environment: "dev"
+    Purpose: "orchestration"

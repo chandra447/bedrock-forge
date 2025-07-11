@@ -17,8 +17,8 @@ spec:
     type: "OPENSEARCH_SERVERLESS"
     # Enhanced OpenSearch Serverless configuration - references auto-created collection
     openSearchServerless:
-      collectionName: "customer-kb-collection"  # References the auto-created collection
-      vectorIndexName: "customer-kb-index"     # Uses the auto-created index
+      collectionName: {ref: customer-kb-collection}  # Reference to OpenSearchServerless resource
+      vectorIndexName: "customer-kb-index"           # Uses the auto-created index
       fieldMapping:
         vectorField: "vector"
         textField: "text"
@@ -48,7 +48,8 @@ spec:
       
       customTransformation:
         transformationLambda:
-          lambdaArn: "arn:aws:lambda:us-east-1:123456789012:function:kb-document-preprocessor"
+          lambdaArn: "arn:aws:lambda:us-east-1:123456789012:function:kb-document-preprocessor"  # External Lambda ARN
+          # For local Lambda references, use: lambda: {ref: preprocessor-function}
         intermediateStorage:
           s3Location:
             uri: "s3://company-kb-temp/transformations/"

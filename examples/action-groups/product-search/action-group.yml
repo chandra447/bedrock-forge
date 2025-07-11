@@ -3,13 +3,13 @@ metadata:
   name: "product-search"
   description: "Action group for product search operations"
 spec:
-  # Required: Agent ID (reference to local agent)
-  agentId: "${module.customer_support.agent_id}"
+  # Required: Agent ID using new reference syntax
+  agentId: {ref: customer-support}  # Reference to Agent resource
   # Optional: Agent version defaults to DRAFT if not specified
   description: "Provides product search and filtering capabilities"
   # Required: Action group executor
   actionGroupExecutor:
-    lambda: "product-search-api"  # References Lambda defined in same project
+    lambda: {ref: product-search-api}  # Reference to Lambda resource
   apiSchema:
     s3:
       s3BucketName: "bedrock-schemas"

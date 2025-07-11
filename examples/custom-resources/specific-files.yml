@@ -17,3 +17,8 @@ spec:
     availability_zones: ["us-east-1a", "us-east-1b"]
   
   description: "VPC and security group infrastructure for Lambda functions"
+  
+  # Dependencies on other resources (if any)
+  dependsOn:
+    - {ref: base-infrastructure}  # Example reference to another CustomResources
+    # - "other-resource"            # String syntax also supported

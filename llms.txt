@@ -22,6 +22,26 @@ Bedrock Forge is an enterprise platform that transforms YAML configurations into
 - OpenAPI schema management for Action Groups
 - Enterprise governance and tagging enforcement
 
+## Reference Syntax
+
+Bedrock Forge supports two syntax formats for cross-resource references:
+
+**Object Syntax (Recommended):**
+```yaml
+lambda: {ref: lambda-name}
+aguardrail:
+  name: {ref: guardrail-name}
+```
+
+**String Syntax (Legacy):**
+```yaml
+lambda: "lambda-name"
+guardrail:
+  name: "guardrail-name"
+```
+
+Both syntaxes are functionally equivalent. The object syntax provides better IDE support and validation, while the string syntax offers more concise YAML. Choose the style that best fits your team's preferences.
+
 ## Supported Resources
 
 ### 1. Agent - AWS Bedrock Conversational Agents
@@ -41,7 +61,7 @@ spec:
   
   # Guardrail configuration
   guardrail: (optional)
-    name: string (required) # Reference to Guardrail resource
+    name: {ref: guardrail-name} | "guardrail-name" # Reference to Guardrail resource
     version: string (optional)
     mode: string (optional)
   
@@ -53,7 +73,7 @@ spec:
       actionGroupState: string (optional)
       skipResourceInUseCheck: bool (optional)
       actionGroupExecutor: (optional)
-        lambda: string (optional) # Reference to Lambda resource
+        lambda: {ref: lambda-name} | "lambda-name" # Reference to Lambda resource
         lambdaArn: string (optional) # Direct Lambda ARN
         customControl: string (optional)
       apiSchema: (optional)
@@ -75,7 +95,7 @@ spec:
   promptOverrides: (optional)
     - promptType: string (required)
       promptArn: string (optional)
-      prompt: string (optional) # Reference to Prompt resource
+      prompt: {ref: prompt-name} | "prompt-name" # Reference to Prompt resource
       promptVariant: string (optional)
       variant: string (optional)
   
@@ -150,7 +170,7 @@ metadata:
   name: string (required)
   description: string (optional)
 spec:
-  agentId: string (required) # Reference to agent via module output
+  agentId: {ref: agent-name} | "agent-name" # Reference to Agent resource
   agentVersion: string (optional) # Default: "DRAFT"
   description: string (optional)
   parentActionGroupSignature: string (optional)
@@ -160,7 +180,7 @@ spec:
   
   # Required executor configuration
   actionGroupExecutor: (required)
-    lambda: string (optional) # Reference to Lambda resource
+    lambda: {ref: lambda-name} | "lambda-name" # Reference to Lambda resource
     lambdaArn: string (optional) # Direct Lambda ARN
     customControl: string (optional)
   
@@ -210,7 +230,7 @@ spec:
     openSearchServerless: (optional)
       collectionArn: string (optional) # Existing collection
       collectionId: string (optional)
-      collectionName: string (optional) # For auto-created collections
+      collectionName: {ref: collection-name} | "collection-name" # Reference to OpenSearchServerless resource
       vectorIndexName: string (required)
       fieldMapping:
         vectorField: string (required)
@@ -236,7 +256,8 @@ spec:
           breakpointPercentileThreshold: int (required)
       customTransformation: (optional)
         transformationLambda: (optional)
-          lambdaArn: string (required)
+          lambdaArn: string (optional) # Direct Lambda ARN
+          lambda: {ref: lambda-name} | "lambda-name" # Reference to Lambda resource
         intermediateStorage: (optional)
           s3Location: (optional)
             uri: string (required)
@@ -314,7 +335,7 @@ spec:
       # Gen AI Resource (Agent integration)
       genAiResource: (optional)
         agent: (optional)
-          agentName: string (optional) # Reference to Agent resource
+          agentName: {ref: agent-name} | "agent-name" # Reference to Agent resource
           agentArn: string (optional) # Direct ARN
 ```
 
@@ -453,7 +474,7 @@ spec:
   # Managed policies
   policies: (optional)
     - policyArn: string (required)
-      policyName: string (optional)
+      policyName: {ref: policy-name} | "policy-name" # Reference to policy resource
   
   # Inline policies
   inlinePolicies: (optional)
@@ -470,7 +491,32 @@ spec:
 
 **Note:** IAM roles are automatically generated for agents and Lambda functions. Use custom IAMRole resources only for specific enterprise requirements.
 
-### 9. CustomResources - Include Your Own Terraform Files
+### 10. AgentKnowledgeBaseAssociation - Link Agents to Knowledge Bases
+
+```yaml
+kind: AgentKnowledgeBaseAssociation
+metadata:
+  name: string (required)
+  description: string (optional)
+spec:
+  # Agent reference (required)
+  agentName: {ref: agent-name} | "agent-name" # Reference to Agent resource
+  
+  # Knowledge base reference (required)
+  knowledgeBaseName: {ref: kb-name} | "kb-name" # Reference to KnowledgeBase resource
+  
+  # Optional configuration
+  description: string (optional)
+  state: string (optional) # "ENABLED" or "DISABLED"
+```
+
+**Key Features:**
+- Links existing agents to knowledge bases
+- Enables retrieval augmented generation (RAG)
+- Supports multiple knowledge bases per agent
+- Automatic dependency management
+
+### 11. CustomResources - Include Your Own Terraform Files
 
 ```yaml
 kind: CustomResources
@@ -486,7 +532,7 @@ spec:
   variables: map[string]interface{} (optional)
   
   # Dependencies for proper ordering
-  dependsOn: []string (optional)
+  dependsOn: [{ref: resource-name} | "resource-name"] (optional)
   
   # Description of what these resources provide
   description: string (optional)
@@ -603,7 +649,54 @@ s3://terraform-artifacts-bucket/
 
 ## Common Patterns and Examples
 
-### 1. Basic Agent with Lambda Action Group
+### 1. Reference Syntax Examples
+
+```yaml
+# Using object syntax (recommended)
+kind: Agent
+metadata:
+  name: modern-agent
+spec:
+  foundationModel: "anthropic.claude-3-sonnet-20240229-v1:0"
+  instruction: "You are a helpful assistant"
+  guardrail:
+    name: {ref: content-safety}  # Object syntax
+  actionGroups:
+    - name: tools
+      actionGroupExecutor:
+        lambda: {ref: utility-functions}  # Object syntax
+  promptOverrides:
+    - promptType: "PRE_PROCESSING"
+      prompt: {ref: preprocessing-prompt}  # Object syntax
+
+# Using string syntax (legacy)
+kind: Agent
+metadata:
+  name: legacy-agent
+spec:
+  foundationModel: "anthropic.claude-3-sonnet-20240229-v1:0"
+  instruction: "You are a helpful assistant"
+  guardrail:
+    name: "content-safety"  # String syntax
+  actionGroups:
+    - name: tools
+      actionGroupExecutor:
+        lambda: "utility-functions"  # String syntax
+  promptOverrides:
+    - promptType: "PRE_PROCESSING"
+      prompt: "preprocessing-prompt"  # String syntax
+
+# Mixed syntax (supported but not recommended)
+kind: ActionGroup
+metadata:
+  name: mixed-references
+spec:
+  agentId: {ref: target-agent}     # Object syntax
+  actionGroupExecutor:
+    lambda: "helper-function"      # String syntax
+```
+
+### 2. Basic Agent with Lambda Action Group
 
 ```yaml
 # lambda.yml
@@ -626,7 +719,7 @@ spec:
   actionGroups:
     - name: order-management
       actionGroupExecutor:
-        lambda: order-lookup
+        lambda: {ref: order-lookup}
       functionSchema:
         functions:
           - name: lookup_order
@@ -638,7 +731,66 @@ spec:
                 type: string
 ```
 
-### 2. Knowledge Base with Custom Infrastructure
+### 3. Knowledge Base with Agent Association
+
+```yaml
+# opensearch.yml
+kind: OpenSearchServerless
+metadata:
+  name: knowledge-store
+spec:
+  collectionName: "company-knowledge"
+  vectorIndex:
+    name: "docs-index"
+    fieldMapping:
+      vectorField: "vector"
+      textField: "text"
+      metadataField: "metadata"
+
+# knowledge-base.yml
+kind: KnowledgeBase
+metadata:
+  name: company-docs
+spec:
+  knowledgeBaseConfiguration:
+    type: VECTOR
+    vectorKnowledgeBaseConfiguration:
+      embeddingModelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v1"
+  storageConfiguration:
+    type: OPENSEARCH_SERVERLESS
+    openSearchServerless:
+      collectionName: {ref: knowledge-store}
+      vectorIndexName: "docs-index"
+      fieldMapping:
+        vectorField: "vector"
+        textField: "text"
+        metadataField: "metadata"
+  dataSources:
+    - name: company-documents
+      type: S3
+      s3Configuration:
+        bucketArn: "arn:aws:s3:::company-docs-bucket"
+
+# agent.yml
+kind: Agent
+metadata:
+  name: knowledge-agent
+spec:
+  foundationModel: "anthropic.claude-3-sonnet-20240229-v1:0"
+  instruction: "You are an assistant with access to company knowledge..."
+
+# association.yml
+kind: AgentKnowledgeBaseAssociation
+metadata:
+  name: agent-kb-link
+spec:
+  agentName: {ref: knowledge-agent}
+  knowledgeBaseName: {ref: company-docs}
+  description: "Link agent to company knowledge base"
+  state: "ENABLED"
+```
+
+### 4. Knowledge Base with Custom Infrastructure
 
 ```yaml
 # infrastructure.yml
@@ -674,10 +826,10 @@ spec:
       s3Configuration:
         bucketArn: "${aws_s3_bucket.docs.arn}"
   dependsOn:
-    - vector-infrastructure
+    - {ref: vector-infrastructure}
 ```
 
-### 3. Prompt with Tool Calling
+### 5. Prompt with Tool Calling
 
 ```yaml
 kind: Prompt
@@ -711,7 +863,7 @@ spec:
               auto: {}
 ```
 
-### 4. Enterprise Agent with Guardrails
+### 6. Enterprise Agent with Guardrails
 
 ```yaml
 # guardrail.yml
@@ -742,7 +894,7 @@ spec:
   foundationModel: "anthropic.claude-3-sonnet-20240229-v1:0"
   instruction: "You are an enterprise customer service agent..."
   guardrail:
-    name: enterprise-safety
+    name: {ref: enterprise-safety}
   tags:
     Environment: production
     Team: customer-service
@@ -756,19 +908,19 @@ spec:
 2. OpenSearchServerless → KnowledgeBase → ActionGroup → Agent
 
 **Cross-Reference Patterns:**
-- Lambda functions: Reference by name in ActionGroups
-- Guardrails: Reference by name in Agents
-- Prompts: Reference by name in Agent promptOverrides
+- Lambda functions: `{ref: lambda-name}` or `"lambda-name"` in ActionGroups
+- Guardrails: `{ref: guardrail-name}` or `"guardrail-name"` in Agents
+- Prompts: `{ref: prompt-name}` or `"prompt-name"` in Agent promptOverrides
 - Custom resources: Use Terraform syntax `${resource.name.output}`
-- Agent references: Use module outputs `${module.agent_name.agent_id}`
+- Agent references: `{ref: agent-name}` or `"agent-name"` for cross-references
 
 **Dependencies:**
 ```yaml
 spec:
   dependsOn:
-    - lambda-function-name  # Lambda resource
-    - infrastructure        # CustomResources
-    - safety-guardrail     # Guardrail resource
+    - {ref: lambda-function-name}  # Lambda resource reference
+    - {ref: infrastructure}        # CustomResources reference
+    - "safety-guardrail"           # Guardrail resource (string syntax)
 ```
 
 ## Best Practices

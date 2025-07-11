@@ -1,0 +1,15 @@
+---
+# Agent-Knowledge Base Association for RAG capabilities
+kind: AgentKnowledgeBaseAssociation
+metadata:
+  name: support-agent-knowledge-link
+  description: Links the customer support agent to the company knowledge base for RAG
+spec:
+  # Agent reference using object syntax
+  agentName: {ref: customer-support-agent}  # Object reference syntax
+  
+  # Knowledge base reference using string syntax (showing mixed usage)
+  knowledgeBaseName: "company-knowledge-base"  # String reference syntax
+  
+  description: "Enables the customer support agent to access company knowledge base for enhanced responses"
+  state: "ENABLED"

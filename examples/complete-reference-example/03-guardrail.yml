@@ -1,0 +1,52 @@
+---
+# Content safety guardrail for customer support
+kind: Guardrail
+metadata:
+  name: customer-support-safety
+  description: Content safety policies for customer support interactions
+spec:
+  description: "Comprehensive content safety for customer support agent"
+  
+  # Content policy for harmful content
+  contentPolicyConfig:
+    filtersConfig:
+      - type: "SEXUAL"
+        inputStrength: "HIGH"
+        outputStrength: "HIGH"
+      - type: "VIOLENCE"
+        inputStrength: "HIGH"
+        outputStrength: "HIGH"
+      - type: "HATE"
+        inputStrength: "MEDIUM"
+        outputStrength: "MEDIUM"
+      - type: "INSULTS"
+        inputStrength: "MEDIUM"
+        outputStrength: "HIGH"
+      - type: "MISCONDUCT"
+        inputStrength: "MEDIUM"
+        outputStrength: "HIGH"
+  
+  # Sensitive information policy
+  sensitiveInformationPolicyConfig:
+    piiEntitiesConfig:
+      - type: "EMAIL"
+        action: "ANONYMIZE"
+      - type: "PHONE"
+        action: "ANONYMIZE"
+      - type: "SSN"
+        action: "BLOCK"
+      - type: "CREDIT_DEBIT_CARD_NUMBER"
+        action: "BLOCK"
+  
+  # Contextual grounding policy
+  contextualGroundingPolicyConfig:
+    filtersConfig:
+      - type: "GROUNDING"
+        threshold: 0.7
+      - type: "RELEVANCE"
+        threshold: 0.8
+  
+  tags:
+    Environment: "dev"
+    Purpose: "content-safety"
+    Team: "customer-support"

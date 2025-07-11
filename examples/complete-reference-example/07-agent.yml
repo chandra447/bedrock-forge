@@ -1,0 +1,82 @@
+---
+# Main customer support agent with comprehensive configuration
+kind: Agent
+metadata:
+  name: customer-support-agent
+  description: AI-powered customer support agent with order lookup and product search capabilities
+spec:
+  foundationModel: "anthropic.claude-3-sonnet-20240229-v1:0"
+  instruction: |
+    You are a helpful and professional customer support agent for our e-commerce platform.
+    
+    Your capabilities include:
+    - Looking up order details and tracking information
+    - Searching for products and providing recommendations
+    - Accessing company knowledge base for policies and procedures
+    - Helping customers with returns, exchanges, and general inquiries
+    
+    Always maintain a friendly, professional tone and prioritize customer satisfaction.
+    When you cannot find specific information, explain what you searched for and offer alternative assistance.
+  
+  description: "AI customer support agent with RAG and function calling"
+  idleSessionTtl: 3600
+  
+  # Content safety using object reference syntax
+  guardrail:
+    name: {ref: customer-support-safety}  # Object reference syntax
+    version: "DRAFT"
+    mode: "GUARDRAILS_ONLY"
+  
+  # Inline action groups (preferred approach)
+  actionGroups:
+    - name: "order-management"
+      description: "Order lookup and tracking functions"
+      actionGroupExecutor:
+        lambda: {ref: order-lookup-function}  # Object reference syntax
+      functionSchema:
+        functions:
+          - name: "lookup_order"
+            description: "Look up customer order details by order ID"
+            parameters:
+              order_id:
+                description: "The order ID to look up (format: ORD-XXXXX)"
+                required: true
+                type: "string"
+  
+  # Prompt overrides using object reference syntax
+  promptOverrides:
+    - promptType: "ORCHESTRATION"
+      prompt: {ref: customer-support-orchestration}  # Object reference syntax
+      variant: "customer-support-v1"
+  
+  # Memory configuration for conversation context
+  memoryConfiguration:
+    enabledMemoryTypes: ["SESSION_SUMMARY"]
+    storageDays: 30
+  
+  # Agent aliases for different environments
+  aliases:
+    - name: "dev"
+      description: "Development environment alias"
+      tags:
+        Environment: "dev"
+        Stage: "development"
+    
+    - name: "staging"  
+      description: "Staging environment alias"
+      tags:
+        Environment: "staging"
+        Stage: "pre-production"
+    
+    - name: "prod"
+      description: "Production environment alias"
+      tags:
+        Environment: "prod"
+        Stage: "production"
+  
+  tags:
+    Environment: "dev"
+    Purpose: "customer-support"
+    Team: "customer-service"
+    Capabilities: "orders,products,knowledge-base"
+    Version: "v2.1"

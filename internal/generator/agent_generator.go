@@ -76,9 +76,9 @@ func (g *HCLGenerator) generateAgentModule(body *hclwrite.Body, resource models.
 	}
 
 	// Guardrail configuration
-	if agent.Guardrail != nil {
+	if agent.Guardrail != nil && !agent.Guardrail.Name.IsEmpty() {
 		guardrailValues := make(map[string]cty.Value)
-		guardrailValues["name"] = cty.StringVal(agent.Guardrail.Name)
+		guardrailValues["name"] = cty.StringVal(agent.Guardrail.Name.String())
 
 		if agent.Guardrail.Version != "" {
 			guardrailValues["version"] = cty.StringVal(agent.Guardrail.Version)
@@ -88,12 +88,14 @@ func (g *HCLGenerator) generateAgentModule(body *hclwrite.Body, resource models.
 			guardrailValues["mode"] = cty.StringVal(agent.Guardrail.Mode)
 		}
 
-		// Check if this is a reference to an existing guardrail or a new one
-		if g.registry.HasResource(models.GuardrailKind, agent.Guardrail.Name) {
-			// Reference to module output
-			guardrailName := g.sanitizeResourceName(agent.Guardrail.Name)
-			guardrailValues["guardrail_id"] = cty.StringVal(fmt.Sprintf("${module.%s.guardrail_id}", guardrailName))
-			guardrailValues["guardrail_version"] = cty.StringVal(fmt.Sprintf("${module.%s.guardrail_version}", guardrailName))
+		// Resolve guardrail reference
+		if guardrailId, err := g.resolveReferenceToOutput(agent.Guardrail.Name, models.GuardrailKind, "guardrail_id"); err == nil {
+			guardrailValues["guardrail_id"] = cty.StringVal(guardrailId)
+			if guardrailVersion, err := g.resolveReferenceToOutput(agent.Guardrail.Name, models.GuardrailKind, "guardrail_version"); err == nil {
+				guardrailValues["guardrail_version"] = cty.StringVal(guardrailVersion)
+			}
+		} else {
+			g.logger.WithError(err).WithField("guardrail", agent.Guardrail.Name.String()).Warn("Failed to resolve guardrail reference")
 		}
 
 		moduleBody.SetAttributeValue("guardrail", cty.ObjectVal(guardrailValues))
@@ -128,11 +130,12 @@ func (g *HCLGenerator) generateAgentModule(body *hclwrite.Body, resource models.
 			if ag.ActionGroupExecutor != nil {
 				executorValues := make(map[string]cty.Value)
 
-				if ag.ActionGroupExecutor.Lambda != "" {
+				if !ag.ActionGroupExecutor.Lambda.IsEmpty() {
 					// Reference to a Lambda resource
-					if g.registry.HasResource(models.LambdaKind, ag.ActionGroupExecutor.Lambda) {
-						lambdaName := g.sanitizeResourceName(ag.ActionGroupExecutor.Lambda)
-						executorValues["lambda"] = cty.StringVal(fmt.Sprintf("${module.%s.lambda_function_arn}", lambdaName))
+					if lambdaArn, err := g.resolveReferenceToOutput(ag.ActionGroupExecutor.Lambda, models.LambdaKind, "lambda_function_arn"); err == nil {
+						executorValues["lambda"] = cty.StringVal(lambdaArn)
+					} else {
+						g.logger.WithError(err).WithField("lambda", ag.ActionGroupExecutor.Lambda.String()).Warn("Failed to resolve lambda reference")
 					}
 				} else if ag.ActionGroupExecutor.LambdaArn != "" {
 					// Direct Lambda ARN
@@ -209,12 +212,12 @@ func (g *HCLGenerator) generateAgentModule(body *hclwrite.Body, resource models.
 			// Always include these fields to ensure consistent structure
 			if po.PromptArn != "" {
 				poValues["prompt_arn"] = cty.StringVal(po.PromptArn)
-			} else if po.Prompt != "" {
+			} else if !po.Prompt.IsEmpty() {
 				// Reference to a prompt module
-				if g.registry.HasResource(models.PromptKind, po.Prompt) {
-					promptName := g.sanitizeResourceName(po.Prompt)
-					poValues["prompt_arn"] = cty.StringVal(fmt.Sprintf("${module.%s.prompt_arn}", promptName))
+				if promptArn, err := g.resolveReferenceToOutput(po.Prompt, models.PromptKind, "prompt_arn"); err == nil {
+					poValues["prompt_arn"] = cty.StringVal(promptArn)
 				} else {
+					g.logger.WithError(err).WithField("prompt", po.Prompt.String()).Warn("Failed to resolve prompt reference")
 					poValues["prompt_arn"] = cty.StringVal("")
 				}
 			} else {

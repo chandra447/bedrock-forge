@@ -1,0 +1,147 @@
+---
+# Order lookup Lambda function
+kind: Lambda
+metadata:
+  name: order-lookup-function
+  description: Lambda function for looking up customer orders
+spec:
+  runtime: "python3.9"
+  handler: "app.lookup_order_handler"
+  timeout: 30
+  memorySize: 256
+  
+  code:
+    source: "zip"
+    zipFile: |
+      import json
+      import boto3
+      from datetime import datetime
+      
+      def lookup_order_handler(event, context):
+          """Look up order details by order ID"""
+          try:
+              # Extract order ID from the event
+              order_id = event.get('order_id')
+              if not order_id:
+                  return {
+                      'statusCode': 400,
+                      'body': json.dumps({'error': 'order_id is required'})
+                  }
+              
+              # Mock order data (in real scenario, query from DynamoDB/RDS)
+              mock_orders = {
+                  'ORD-12345': {
+                      'order_id': 'ORD-12345',
+                      'status': 'shipped',
+                      'total': 99.99,
+                      'items': ['Widget A', 'Widget B'],
+                      'tracking': 'TRK-67890',
+                      'expected_delivery': '2024-01-15'
+                  },
+                  'ORD-67890': {
+                      'order_id': 'ORD-67890', 
+                      'status': 'processing',
+                      'total': 149.99,
+                      'items': ['Premium Widget'],
+                      'tracking': None,
+                      'expected_delivery': '2024-01-20'
+                  }
+              }
+              
+              order = mock_orders.get(order_id)
+              if not order:
+                  return {
+                      'statusCode': 404,
+                      'body': json.dumps({'error': f'Order {order_id} not found'})
+                  }
+              
+              return {
+                  'statusCode': 200,
+                  'body': json.dumps(order)
+              }
+              
+          except Exception as e:
+              return {
+                  'statusCode': 500,
+                  'body': json.dumps({'error': str(e)})
+              }
+  
+  environment:
+    LOG_LEVEL: "INFO"
+    ENVIRONMENT: "dev"
+  
+  tags:
+    Environment: "dev"
+    Purpose: "order-lookup"
+    Team: "customer-support"
+
+---
+# Product search Lambda function  
+kind: Lambda
+metadata:
+  name: product-search-function
+  description: Lambda function for searching products
+spec:
+  runtime: "python3.9"
+  handler: "app.search_products_handler"
+  timeout: 30
+  memorySize: 256
+  
+  code:
+    source: "zip" 
+    zipFile: |
+      import json
+      import re
+      
+      def search_products_handler(event, context):
+          """Search for products by query and optional category"""
+          try:
+              query = event.get('query', '').lower()
+              category = event.get('category', '').lower()
+              
+              if not query:
+                  return {
+                      'statusCode': 400,
+                      'body': json.dumps({'error': 'query is required'})
+                  }
+              
+              # Mock product catalog
+              products = [
+                  {'id': 1, 'name': 'Basic Widget', 'category': 'widgets', 'price': 29.99, 'in_stock': True},
+                  {'id': 2, 'name': 'Premium Widget', 'category': 'widgets', 'price': 79.99, 'in_stock': True},
+                  {'id': 3, 'name': 'Widget Pro Max', 'category': 'widgets', 'price': 149.99, 'in_stock': False},
+                  {'id': 4, 'name': 'Gadget Basic', 'category': 'gadgets', 'price': 39.99, 'in_stock': True},
+                  {'id': 5, 'name': 'Smart Gadget', 'category': 'gadgets', 'price': 99.99, 'in_stock': True},
+              ]
+              
+              # Filter by query
+              results = []
+              for product in products:
+                  if query in product['name'].lower():
+                      if not category or category in product['category']:
+                          results.append(product)
+              
+              return {
+                  'statusCode': 200,
+                  'body': json.dumps({
+                      'query': query,
+                      'category': category or 'all',
+                      'results': results,
+                      'count': len(results)
+                  })
+              }
+              
+          except Exception as e:
+              return {
+                  'statusCode': 500,
+                  'body': json.dumps({'error': str(e)})
+              }
+  
+  environment:
+    LOG_LEVEL: "INFO"
+    ENVIRONMENT: "dev"
+  
+  tags:
+    Environment: "dev"
+    Purpose: "product-search" 
+    Team: "customer-support"

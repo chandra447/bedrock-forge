@@ -16,7 +16,7 @@ type CustomResourcesSpec struct {
 	Files []string `yaml:"files,omitempty"`
 
 	// Dependencies on other resources (for ordering)
-	DependsOn []string `yaml:"dependsOn,omitempty"`
+	DependsOn []Reference `yaml:"dependsOn,omitempty"` // References to other resources
 
 	// Description of what these resources provide
 	Description string `yaml:"description,omitempty"`
@@ -46,7 +46,7 @@ type CustomModuleSpec struct {
 	Variables map[string]interface{} `yaml:"variables,omitempty"`
 
 	// Dependencies on other resources (for ordering)
-	DependsOn []string `yaml:"dependsOn,omitempty"`
+	DependsOn []Reference `yaml:"dependsOn,omitempty"` // References to other resources
 
 	// Description of what this module does
 	Description string `yaml:"description,omitempty"`

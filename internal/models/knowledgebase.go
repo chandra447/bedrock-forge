@@ -94,7 +94,8 @@ type CustomTransformation struct {
 }
 
 type TransformationLambda struct {
-	LambdaArn string `yaml:"lambdaArn"`
+	LambdaArn string    `yaml:"lambdaArn,omitempty"` // External Lambda ARN
+	Lambda    Reference `yaml:"lambda,omitempty"`    // Reference to Lambda resource
 }
 
 type IntermediateStorage struct {

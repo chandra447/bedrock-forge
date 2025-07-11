@@ -278,7 +278,7 @@ func (g *HCLGenerator) findAgentsReferencingLambda(lambdaName string) []string {
 		if agent, ok := resource.Resource.(*models.Agent); ok {
 			// Check inline action groups
 			for _, ag := range agent.Spec.ActionGroups {
-				if ag.ActionGroupExecutor != nil && ag.ActionGroupExecutor.Lambda == lambdaName {
+				if ag.ActionGroupExecutor != nil && ag.ActionGroupExecutor.Lambda.String() == lambdaName {
 					referencingAgents = append(referencingAgents, resource.Metadata.Name)
 					break // Found one reference, no need to check more action groups for this agent
 				}
@@ -289,11 +289,11 @@ func (g *HCLGenerator) findAgentsReferencingLambda(lambdaName string) []string {
 	// Also check standalone ActionGroup resources that reference this Lambda
 	for _, resource := range g.registry.GetResourcesByKind(models.ActionGroupKind) {
 		if actionGroup, ok := resource.Resource.(*models.ActionGroup); ok {
-			if actionGroup.Spec.ActionGroupExecutor != nil && actionGroup.Spec.ActionGroupExecutor.Lambda == lambdaName {
+			if actionGroup.Spec.ActionGroupExecutor != nil && actionGroup.Spec.ActionGroupExecutor.Lambda.String() == lambdaName {
 				// For standalone action groups, we need to find the agent they belong to
 				// Parse agentId to extract agent name if it's a module reference
-				if actionGroup.Spec.AgentId != "" {
-					agentName := extractAgentNameFromId(actionGroup.Spec.AgentId)
+				if !actionGroup.Spec.AgentId.IsEmpty() {
+					agentName := extractAgentNameFromId(actionGroup.Spec.AgentId.String())
 					if agentName != "" {
 						referencingAgents = append(referencingAgents, agentName)
 					}

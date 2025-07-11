@@ -7,7 +7,7 @@ type ActionGroup struct {
 }
 
 type ActionGroupSpec struct {
-	AgentId                    string               `yaml:"agentId"`                // Required: agent_id is required per AWS docs
+	AgentId                    Reference            `yaml:"agentId"`                // Required: agent_id is required per AWS docs
 	AgentVersion               string               `yaml:"agentVersion,omitempty"` // Optional: agent version (defaults to DRAFT)
 	Description                string               `yaml:"description,omitempty"`
 	ParentActionGroupSignature string               `yaml:"parentActionGroupSignature,omitempty"`
@@ -20,9 +20,9 @@ type ActionGroupSpec struct {
 }
 
 type ActionGroupExecutor struct {
-	Lambda        string `yaml:"lambda,omitempty"`
-	LambdaArn     string `yaml:"lambdaArn,omitempty"`
-	CustomControl string `yaml:"customControl,omitempty"`
+	Lambda        Reference `yaml:"lambda,omitempty"`    // Reference to Lambda resource
+	LambdaArn     string    `yaml:"lambdaArn,omitempty"` // External Lambda ARN
+	CustomControl string    `yaml:"customControl,omitempty"`
 }
 
 type APISchema struct {

@@ -1,0 +1,69 @@
+---
+# Knowledge base with company documentation
+kind: KnowledgeBase
+metadata:
+  name: company-knowledge-base
+  description: Vector knowledge base containing company documentation and FAQs
+spec:
+  description: "Customer support knowledge base with product docs and FAQs"
+  
+  # Vector knowledge base configuration
+  knowledgeBaseConfiguration:
+    type: "VECTOR"
+    vectorKnowledgeBaseConfiguration:
+      embeddingModelArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v1"
+      embeddingModelConfiguration:
+        bedrockEmbeddingModelConfiguration:
+          dimensions: 1536
+  
+  # Storage using our OpenSearch Serverless collection (object syntax)
+  storageConfiguration:
+    type: "OPENSEARCH_SERVERLESS"
+    openSearchServerless:
+      collectionName: {ref: knowledge-collection}  # Object reference syntax
+      vectorIndexName: "docs-index"
+      fieldMapping:
+        vectorField: "vector"
+        textField: "text"
+        metadataField: "metadata"
+  
+  # Data sources
+  dataSources:
+    - name: "company-documentation"
+      type: "S3"
+      s3Configuration:
+        bucketArn: "arn:aws:s3:::company-docs-bucket"
+        inclusionPrefixes:
+          - "docs/"
+          - "faqs/"
+          - "policies/"
+        exclusionPrefixes:
+          - "temp/"
+          - "drafts/"
+      
+      chunkingConfiguration:
+        chunkingStrategy: "FIXED_SIZE"
+        fixedSizeChunkingConfiguration:
+          maxTokens: 512
+          overlapPercentage: 20
+    
+    - name: "product-manuals"
+      type: "S3"
+      s3Configuration:
+        bucketArn: "arn:aws:s3:::product-manuals-bucket"
+        inclusionPrefixes:
+          - "manuals/"
+          - "guides/"
+      
+      chunkingConfiguration:
+        chunkingStrategy: "SEMANTIC"
+        semanticChunkingConfiguration:
+          maxTokens: 300
+          bufferSize: 100
+          breakpointPercentileThreshold: 95
+  
+  tags:
+    Environment: "dev"
+    Purpose: "knowledge-base"
+    Team: "customer-support"
+    DataSources: "company-docs,product-manuals"

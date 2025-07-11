@@ -34,7 +34,7 @@ type GenAiResourceConfig struct {
 
 type AgentResourceConfig struct {
 	// Reference to an agent YAML config in the same project
-	AgentName string `yaml:"agentName,omitempty"`
+	AgentName Reference `yaml:"agentName,omitempty"` // Reference to Agent resource
 
 	// Direct ARN reference to an existing deployed agent
 	AgentArn string `yaml:"agentArn,omitempty"`

@@ -9,7 +9,7 @@ type IAMRoleConfig struct {
 	RoleArn string `yaml:"roleArn,omitempty"`
 
 	// For referencing a manually defined IAMRole resource
-	RoleName string `yaml:"roleName,omitempty"`
+	RoleName Reference `yaml:"roleName,omitempty"` // Reference to IAMRole resource
 
 	// Additional policies to attach to auto-generated roles
 	AdditionalPolicies []IAMPolicyReference `yaml:"additionalPolicies,omitempty"`
@@ -42,8 +42,8 @@ type AssumeRolePolicyStatement struct {
 }
 
 type IAMPolicyAttachment struct {
-	PolicyArn  string `yaml:"policyArn"`
-	PolicyName string `yaml:"policyName,omitempty"`
+	PolicyArn  string    `yaml:"policyArn"`            // External AWS policy ARN
+	PolicyName Reference `yaml:"policyName,omitempty"` // Reference to policy resource
 }
 
 type IAMInlinePolicy struct {
@@ -65,6 +65,6 @@ type IAMPolicyStatement struct {
 }
 
 type IAMPolicyReference struct {
-	PolicyArn  string `yaml:"policyArn,omitempty"`
-	PolicyName string `yaml:"policyName,omitempty"`
+	PolicyArn  string    `yaml:"policyArn,omitempty"`  // External AWS policy ARN
+	PolicyName Reference `yaml:"policyName,omitempty"` // Reference to policy resource
 }
