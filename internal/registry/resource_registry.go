@@ -194,43 +194,6 @@ func (r *ResourceRegistry) ValidateDependencies() []error {
 		}
 	}
 
-	// Validate CustomModule dependencies
-	customModules := r.resources[models.CustomModuleKind]
-	for _, cmResource := range customModules {
-		customModule := cmResource.Resource.(*models.CustomModule)
-
-		// Validate dependsOn references
-		for _, depRef := range customModule.Spec.DependsOn {
-			if depRef.IsEmpty() {
-				continue
-			}
-			depName := depRef.String()
-			found := false
-			// Check all resource types for the dependency
-			resourceTypes := []models.ResourceKind{
-				models.AgentKind,
-				models.LambdaKind,
-				models.ActionGroupKind,
-				models.KnowledgeBaseKind,
-				models.GuardrailKind,
-				models.PromptKind,
-				models.IAMRoleKind,
-				models.CustomModuleKind,
-				models.OpenSearchServerlessKind,
-			}
-
-			for _, resourceType := range resourceTypes {
-				if _, exists := r.resources[resourceType][depName]; exists {
-					found = true
-					break
-				}
-			}
-
-			if !found {
-				errors = append(errors, fmt.Errorf("custom module %s references non-existent dependency %s", customModule.Metadata.Name, depName))
-			}
-		}
-	}
 
 	return errors
 }
@@ -294,11 +257,19 @@ func (r *ResourceRegistry) GetResourcesByType(kind models.ResourceKind) []models
 				if iamRole, ok := resource.Resource.(*models.IAMRole); ok {
 					spec = iamRole.Spec
 				}
-			case models.OpenSearchServerlessKind:
-				if opensearchServerless, ok := resource.Resource.(*models.OpenSearchServerless); ok {
-					spec = opensearchServerless.Spec
-				}
+		case models.OpenSearchServerlessKind:
+			if opensearchServerless, ok := resource.Resource.(*models.OpenSearchServerless); ok {
+				spec = opensearchServerless.Spec
 			}
+		case models.CustomResourcesKind:
+			if customResources, ok := resource.Resource.(*models.CustomResources); ok {
+				spec = customResources.Spec
+			}
+		case models.AgentKnowledgeBaseAssociationKind:
+			if association, ok := resource.Resource.(*models.AgentKnowledgeBaseAssociation); ok {
+				spec = association.Spec
+			}
+		}
 
 			result = append(result, models.BaseResource{
 				Kind:     resource.Kind,
