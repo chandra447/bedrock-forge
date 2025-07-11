@@ -18,14 +18,14 @@ type AgentSpec struct {
 	PromptOverrides       []PromptOverride     `yaml:"promptOverrides,omitempty"`
 	MemoryConfiguration   *MemoryConfiguration `yaml:"memoryConfiguration,omitempty"`
 	Aliases               []AgentAlias         `yaml:"aliases,omitempty"`
-	
+
 	// IAM Role configuration - allows users to specify existing roles or customize auto-generated ones
-	IAMRole               *IAMRoleConfig       `yaml:"iamRole,omitempty"`
-	
+	IAMRole *IAMRoleConfig `yaml:"iamRole,omitempty"`
+
 	// Missing Terraform attributes
-	PrepareAgent              *bool             `yaml:"prepareAgent,omitempty"`              // Default: true
-	SkipResourceInUseCheck    *bool             `yaml:"skipResourceInUseCheck,omitempty"`    // Default: false
-	Timeouts                  *AgentTimeouts    `yaml:"timeouts,omitempty"`
+	PrepareAgent           *bool          `yaml:"prepareAgent,omitempty"`           // Default: true
+	SkipResourceInUseCheck *bool          `yaml:"skipResourceInUseCheck,omitempty"` // Default: false
+	Timeouts               *AgentTimeouts `yaml:"timeouts,omitempty"`
 }
 
 type GuardrailConfig struct {

@@ -89,7 +89,7 @@ func (g *HCLGenerator) generateLambdaNative(body *hclwrite.Body, resource models
 		resourceBody.SetAttributeRaw("source_code_hash", hclwrite.Tokens{
 			{Type: hclsyntax.TokenIdent, Bytes: []byte(fmt.Sprintf("data.archive_file.%s.output_base64sha256", resourceName))},
 		})
-		
+
 		// Generate archive data source
 		g.generateArchiveDataSource(body, resourceName, lambda.Code.Source)
 	}
@@ -98,19 +98,19 @@ func (g *HCLGenerator) generateLambdaNative(body *hclwrite.Body, resource models
 	if len(lambda.Environment) > 0 {
 		envBlock := resourceBody.AppendNewBlock("environment", nil)
 		envBody := envBlock.Body()
-		
+
 		envVarMap := make(map[string]string)
 		for key, value := range lambda.Environment {
 			envVarMap[key] = value
 		}
-		
+
 		// Build the variables block content
 		var tokens hclwrite.Tokens
 		tokens = append(tokens, &hclwrite.Token{Type: hclsyntax.TokenOBrace, Bytes: []byte("{\n")})
 		for key, value := range envVarMap {
 			tokens = append(tokens, &hclwrite.Token{Type: hclsyntax.TokenIdent, Bytes: []byte("    " + key)})
 			tokens = append(tokens, &hclwrite.Token{Type: hclsyntax.TokenEqual, Bytes: []byte(" = ")})
-			
+
 			// Check if this is a Terraform reference
 			if strings.HasPrefix(value, "${") && strings.HasSuffix(value, "}") {
 				// Extract the reference without the ${} wrapper
@@ -124,7 +124,7 @@ func (g *HCLGenerator) generateLambdaNative(body *hclwrite.Body, resource models
 			tokens = append(tokens, &hclwrite.Token{Type: hclsyntax.TokenNewline, Bytes: []byte("\n")})
 		}
 		tokens = append(tokens, &hclwrite.Token{Type: hclsyntax.TokenCBrace, Bytes: []byte("  }")})
-		
+
 		envBody.SetAttributeRaw("variables", tokens)
 	}
 
@@ -369,7 +369,7 @@ func (g *HCLGenerator) setLambdaNativeAdvancedAttributes(resourceBody *hclwrite.
 	if lambda.ImageConfig != nil {
 		imgBlock := resourceBody.AppendNewBlock("image_config", nil)
 		imgBody := imgBlock.Body()
-		
+
 		if len(lambda.ImageConfig.Command) > 0 {
 			cmdVals := make([]cty.Value, 0, len(lambda.ImageConfig.Command))
 			for _, cmd := range lambda.ImageConfig.Command {
@@ -422,7 +422,7 @@ func (g *HCLGenerator) setLambdaNativeAdvancedAttributes(resourceBody *hclwrite.
 	if lambda.Timeouts != nil {
 		timeoutBlock := resourceBody.AppendNewBlock("timeouts", nil)
 		timeoutBody := timeoutBlock.Body()
-		
+
 		if lambda.Timeouts.Create != "" {
 			timeoutBody.SetAttributeValue("create", cty.StringVal(lambda.Timeouts.Create))
 		}
@@ -452,4 +452,3 @@ func (g *HCLGenerator) needsS3Permissions(lambda models.LambdaSpec) bool {
 	}
 	return false
 }
-

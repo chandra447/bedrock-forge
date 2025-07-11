@@ -13,9 +13,9 @@ type PromptSpec struct {
 	InputVariables           []PromptInputVariable `yaml:"inputVariables,omitempty"`
 	Variants                 []PromptVariant       `yaml:"variants"`
 	Tags                     map[string]string     `yaml:"tags,omitempty"`
-	
+
 	// Missing Terraform attributes
-	Timeouts                 *PromptTimeouts       `yaml:"timeouts,omitempty"`
+	Timeouts *PromptTimeouts `yaml:"timeouts,omitempty"`
 }
 
 type PromptInputVariable struct {

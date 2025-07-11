@@ -222,7 +222,7 @@ func (g *HCLGenerator) generateTemplateConfiguration(templateConfig *models.Temp
 				chatValues["tool_configuration"] = cty.ObjectVal(map[string]cty.Value{
 					"tools": cty.ListValEmpty(cty.Object(map[string]cty.Type{
 						"tool_spec": cty.Object(map[string]cty.Type{
-							"name": cty.String,
+							"name":        cty.String,
 							"description": cty.String,
 							"input_schema": cty.Object(map[string]cty.Type{
 								"json": cty.String,

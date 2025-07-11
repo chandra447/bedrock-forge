@@ -615,7 +615,7 @@ func (g *HCLGenerator) resolveReferenceToOutput(ref models.Reference, expectedKi
 
 	// Return the native resource reference
 	sanitizedName := g.sanitizeResourceName(resourceName)
-	
+
 	// Map resource kinds to their AWS resource types and outputs
 	switch expectedKind {
 	case models.AgentKind:

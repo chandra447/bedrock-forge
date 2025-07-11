@@ -193,7 +193,7 @@ func (g *HCLGenerator) generateActionGroupModule(body *hclwrite.Body, resource m
 					}
 					paramMap[paramName] = paramInfo
 				}
-				
+
 				// Convert to JSON string for consistent type
 				paramJSON, err := json.Marshal(paramMap)
 				if err != nil {

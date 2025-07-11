@@ -216,27 +216,27 @@ func (g *HCLGenerator) generateLambdaResourcePolicies(lambdaName string, lambda 
 					if objVal, ok := v.(map[string]interface{}); ok {
 						// Handle nested condition objects, ensuring consistent structure
 						nestedValues := make(map[string]cty.Value)
-						
+
 						// Normalize to have consistent schema with agent conditions
 						nestedValues["aws:SourceArn"] = cty.StringVal("")
 						nestedValues["aws:SourceAccount"] = cty.StringVal("")
-						
+
 						for nk, nv := range objVal {
 							if nstr, ok := nv.(string); ok {
 								nestedValues[nk] = cty.StringVal(nstr)
 							}
 						}
-					conditionValues[k] = cty.ObjectVal(nestedValues)
-					continue
+						conditionValues[k] = cty.ObjectVal(nestedValues)
+						continue
+					}
+
+					conditionValues[k] = cty.StringVal(fmt.Sprintf("%v", v))
 				}
-				
-				conditionValues[k] = cty.StringVal(fmt.Sprintf("%v", v))
+				conditionVal = cty.ObjectVal(conditionValues)
+			} else {
+				// Create empty condition with consistent structure
+				conditionVal = cty.EmptyObjectVal
 			}
-			conditionVal = cty.ObjectVal(conditionValues)
-		} else {
-			// Create empty condition with consistent structure
-			conditionVal = cty.EmptyObjectVal
-		}
 
 			policyStatements = append(policyStatements, g.createPolicyStatement(stmt.Sid, stmt.Effect, principalList, actionList, conditionVal))
 		}
@@ -267,7 +267,7 @@ func (g *HCLGenerator) generateLambdaResourcePolicies(lambdaName string, lambda 
 			// Normalize all conditions to have consistent field schemas
 			agentCondition := cty.ObjectVal(map[string]cty.Value{
 				"StringEquals": cty.ObjectVal(map[string]cty.Value{
-					"aws:SourceArn": cty.StringVal(fmt.Sprintf("${module.%s.agent_arn}", agentResourceName)),
+					"aws:SourceArn":     cty.StringVal(fmt.Sprintf("${module.%s.agent_arn}", agentResourceName)),
 					"aws:SourceAccount": cty.StringVal(""), // Add empty field for consistency
 				}),
 			})

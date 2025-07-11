@@ -7,20 +7,20 @@ type ActionGroup struct {
 }
 
 type ActionGroupSpec struct {
-	AgentId                    Reference                 `yaml:"agentId"`                // Required: agent_id is required per AWS docs
-	AgentVersion               string                    `yaml:"agentVersion,omitempty"` // Optional: agent version (defaults to DRAFT)
-	Description                string                    `yaml:"description,omitempty"`
-	ParentActionGroupSignature string                    `yaml:"parentActionGroupSignature,omitempty"`
-	ActionGroupExecutor        *ActionGroupExecutor      `yaml:"actionGroupExecutor"` // Required: action_group_executor is required
-	ActionGroupState           string                    `yaml:"actionGroupState,omitempty"`
-	APISchema                  *APISchema                `yaml:"apiSchema,omitempty"`
-	FunctionSchema             *FunctionSchema           `yaml:"functionSchema,omitempty"`
-	SkipResourceInUseCheck     bool                      `yaml:"skipResourceInUseCheck,omitempty"` // Optional: skip_resource_in_use_check
-	Tags                       map[string]string         `yaml:"tags,omitempty"`
-	
+	AgentId                    Reference            `yaml:"agentId"`                // Required: agent_id is required per AWS docs
+	AgentVersion               string               `yaml:"agentVersion,omitempty"` // Optional: agent version (defaults to DRAFT)
+	Description                string               `yaml:"description,omitempty"`
+	ParentActionGroupSignature string               `yaml:"parentActionGroupSignature,omitempty"`
+	ActionGroupExecutor        *ActionGroupExecutor `yaml:"actionGroupExecutor"` // Required: action_group_executor is required
+	ActionGroupState           string               `yaml:"actionGroupState,omitempty"`
+	APISchema                  *APISchema           `yaml:"apiSchema,omitempty"`
+	FunctionSchema             *FunctionSchema      `yaml:"functionSchema,omitempty"`
+	SkipResourceInUseCheck     bool                 `yaml:"skipResourceInUseCheck,omitempty"` // Optional: skip_resource_in_use_check
+	Tags                       map[string]string    `yaml:"tags,omitempty"`
+
 	// Missing Terraform attributes
-	PrepareAgent               *bool                     `yaml:"prepareAgent,omitempty"`               // Default: true
-	Timeouts                   *ActionGroupTimeouts      `yaml:"timeouts,omitempty"`
+	PrepareAgent *bool                `yaml:"prepareAgent,omitempty"` // Default: true
+	Timeouts     *ActionGroupTimeouts `yaml:"timeouts,omitempty"`
 }
 
 type ActionGroupExecutor struct {

@@ -17,27 +17,27 @@ type LambdaSpec struct {
 	Tags                map[string]string     `yaml:"tags,omitempty"`
 	VpcConfig           *VpcConfig            `yaml:"vpcConfig,omitempty"`
 	ResourcePolicy      *LambdaResourcePolicy `yaml:"resourcePolicy,omitempty"`
-	
+
 	// Missing critical Terraform attributes
-	Role                    Reference               `yaml:"role,omitempty"`                    // Reference to IAM role or ARN
-	RoleArn                 string                  `yaml:"roleArn,omitempty"`                 // Direct IAM role ARN
-	Architectures           []string                `yaml:"architectures,omitempty"`           // x86_64, arm64
-	CodeSigningConfigArn    string                  `yaml:"codeSigningConfigArn,omitempty"`    // Code signing config ARN
-	DeadLetterConfig        *DeadLetterConfig       `yaml:"deadLetterConfig,omitempty"`        // DLQ configuration
-	EphemeralStorage        *EphemeralStorage       `yaml:"ephemeralStorage,omitempty"`        // /tmp storage size
-	FileSystemConfig        *FileSystemConfig       `yaml:"fileSystemConfig,omitempty"`        // EFS config
-	ImageConfig             *ImageConfig            `yaml:"imageConfig,omitempty"`             // Container image config
-	KmsKeyArn               string                  `yaml:"kmsKeyArn,omitempty"`               // KMS key for encryption
-	Layers                  []string                `yaml:"layers,omitempty"`                  // Lambda layer ARNs
-	PackageType             string                  `yaml:"packageType,omitempty"`             // Zip or Image
-	Publish                 *bool                   `yaml:"publish,omitempty"`                 // Create version on update
-	ReplaceSecurityGroupsOnDestroy *bool           `yaml:"replaceSecurityGroupsOnDestroy,omitempty"`
-	ReplacementSecurityGroupIds    []string        `yaml:"replacementSecurityGroupIds,omitempty"`
-	SkipDestroy             *bool                   `yaml:"skipDestroy,omitempty"`             // Skip destroy
-	SnapStart               *SnapStart              `yaml:"snapStart,omitempty"`               // SnapStart config
-	SourceCodeHash          string                  `yaml:"sourceCodeHash,omitempty"`          // Source code hash
-	Timeouts                *LambdaTimeouts         `yaml:"timeouts,omitempty"`                // Terraform timeouts
-	TracingConfig           *TracingConfig          `yaml:"tracingConfig,omitempty"`           // X-Ray tracing
+	Role                           Reference         `yaml:"role,omitempty"`                 // Reference to IAM role or ARN
+	RoleArn                        string            `yaml:"roleArn,omitempty"`              // Direct IAM role ARN
+	Architectures                  []string          `yaml:"architectures,omitempty"`        // x86_64, arm64
+	CodeSigningConfigArn           string            `yaml:"codeSigningConfigArn,omitempty"` // Code signing config ARN
+	DeadLetterConfig               *DeadLetterConfig `yaml:"deadLetterConfig,omitempty"`     // DLQ configuration
+	EphemeralStorage               *EphemeralStorage `yaml:"ephemeralStorage,omitempty"`     // /tmp storage size
+	FileSystemConfig               *FileSystemConfig `yaml:"fileSystemConfig,omitempty"`     // EFS config
+	ImageConfig                    *ImageConfig      `yaml:"imageConfig,omitempty"`          // Container image config
+	KmsKeyArn                      string            `yaml:"kmsKeyArn,omitempty"`            // KMS key for encryption
+	Layers                         []string          `yaml:"layers,omitempty"`               // Lambda layer ARNs
+	PackageType                    string            `yaml:"packageType,omitempty"`          // Zip or Image
+	Publish                        *bool             `yaml:"publish,omitempty"`              // Create version on update
+	ReplaceSecurityGroupsOnDestroy *bool             `yaml:"replaceSecurityGroupsOnDestroy,omitempty"`
+	ReplacementSecurityGroupIds    []string          `yaml:"replacementSecurityGroupIds,omitempty"`
+	SkipDestroy                    *bool             `yaml:"skipDestroy,omitempty"`    // Skip destroy
+	SnapStart                      *SnapStart        `yaml:"snapStart,omitempty"`      // SnapStart config
+	SourceCodeHash                 string            `yaml:"sourceCodeHash,omitempty"` // Source code hash
+	Timeouts                       *LambdaTimeouts   `yaml:"timeouts,omitempty"`       // Terraform timeouts
+	TracingConfig                  *TracingConfig    `yaml:"tracingConfig,omitempty"`  // X-Ray tracing
 }
 
 type LambdaResourcePolicy struct {
