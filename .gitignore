@@ -2,3 +2,5 @@
 developmentplan.md.bedrock-forge/
 .bedrock-forge/bedrock-forge
 main
+.bedrock-forge/
+test_output/
