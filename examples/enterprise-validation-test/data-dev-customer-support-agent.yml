@@ -13,7 +13,7 @@ spec:
     Environment: "dev"
     Project: "customer-support-platform"
     Owner: "john.doe@company.com"
-    CostCenter: "CC-123456"
+    CostCenter: "COST-CENTER-123456"
     Team: "data"
     BusinessUnit: "engineering"
     DataClassification: "internal"

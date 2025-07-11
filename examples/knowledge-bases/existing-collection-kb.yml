@@ -50,5 +50,7 @@ spec:
   tags:
     Environment: "prod"
     Project: "enterprise-kb"
+    DataSource: "S3"
+    ContentType: "policies"
     CollectionType: "existing"
     ManagedBy: "bedrock-forge"

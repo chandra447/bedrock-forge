@@ -196,6 +196,7 @@ spec:
   
   tags:
     Environment: "prod"
+    Project: "customer-support-platform"
     Team: "ai-platform"
     TemplateType: "chat"
     ToolsEnabled: "true"

@@ -9,6 +9,12 @@ spec:
   instruction: |
     You are a helpful customer service agent that processes customer inquiries
     and can send notifications about important events through your action groups.
+    
+  tags:
+    Environment: "dev"
+    Project: "customer-support-platform"
+    AgentType: "notification-service"
+    BusinessFunction: "alert-management"
   
   actionGroups:
     - name: "notification-handler"
@@ -76,5 +82,9 @@ spec:
     EVENTBRIDGE_RULE: "${aws_cloudwatch_event_rule.agent_events.name}"
   
   tags:
+    Environment: "dev"
+    Project: "customer-support-platform"
+    Runtime: "python3.9"
+    FunctionType: "notification"
     Purpose: "notifications"
     CustomResources: "true"

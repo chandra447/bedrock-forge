@@ -7,6 +7,11 @@ spec:
   agentId: {ref: customer-support}  # Reference to Agent resource
   # Optional: Agent version defaults to DRAFT if not specified
   description: "Provides product search and filtering capabilities"
+  
+  tags:
+    Environment: "dev"
+    Project: "customer-support-platform"
+    
   # Required: Action group executor
   actionGroupExecutor:
     lambda: {ref: product-search-api}  # Reference to Lambda resource

@@ -70,5 +70,6 @@ spec:
   tags:
     Environment: "prod"
     Project: "customer-support"
-    DataSource: "faq-and-manuals"
+    DataSource: "S3"
+    ContentType: "FAQ"
     ManagedBy: "bedrock-forge"

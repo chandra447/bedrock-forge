@@ -48,6 +48,9 @@ spec:
   
   tags:
     Environment: "dev"
+    Project: "customer-support-platform"
+    AgentType: "customer-service"
+    BusinessFunction: "order-management"
     Purpose: "customer-support"
     ReferenceSyntax: "object-demo"
 
@@ -78,6 +81,7 @@ spec:
   
   tags:
     Environment: "dev"
+    Project: "customer-support-platform"
     Purpose: "content-safety"
 
 ---
@@ -113,6 +117,9 @@ spec:
   
   tags:
     Environment: "dev"
+    Project: "customer-support-platform"
+    Runtime: "python3.9"
+    FunctionType: "order-lookup"
     Purpose: "order-lookup"
 
 ---
@@ -151,4 +158,5 @@ spec:
   
   tags:
     Environment: "dev"
+    Project: "customer-support-platform"
     Purpose: "orchestration"

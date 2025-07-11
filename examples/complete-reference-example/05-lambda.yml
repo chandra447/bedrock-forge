@@ -72,6 +72,9 @@ spec:
   
   tags:
     Environment: "dev"
+    Project: "customer-support-platform"
+    Runtime: "python3.9"
+    FunctionType: "order-lookup"
     Purpose: "order-lookup"
     Team: "customer-support"
 
@@ -143,5 +146,8 @@ spec:
   
   tags:
     Environment: "dev"
-    Purpose: "product-search" 
+    Project: "customer-support-platform"
+    Runtime: "python3.9"
+    FunctionType: "product-search"
+    Purpose: "product-search"
     Team: "customer-support"

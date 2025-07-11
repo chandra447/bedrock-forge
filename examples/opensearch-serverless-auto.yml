@@ -51,6 +51,6 @@ spec:
       metadataField: "metadata"  # Field name for document metadata
   
   tags:
-    Environment: "production"
+    Environment: "custom-production"
     Project: "customer-support"
     ManagedBy: "bedrock-forge"

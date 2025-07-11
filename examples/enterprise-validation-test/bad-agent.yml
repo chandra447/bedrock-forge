@@ -12,7 +12,10 @@ spec:
   # Missing memoryConfiguration (required in enterprise)
   
   tags:
-    # Missing required tags: Environment, Project, Owner, CostCenter, Team, 
-    # BusinessUnit, DataClassification, ComplianceLevel, AgentType, 
-    # BusinessFunction, DataProcessing, SecurityLevel
+    Environment: "dev"
+    Project: "customer-support-platform"
+    AgentType: "customer-service"
+    BusinessFunction: "order-management"
+    # Missing required tags: CostCenter, Team, BusinessUnit, DataClassification, 
+    # ComplianceLevel, DataProcessing, SecurityLevel
     SomeCustomTag: "value"

@@ -8,6 +8,10 @@ spec:
   # Optional: Agent version (defaults to DRAFT)
   agentVersion: "DRAFT"
   description: "Provides order lookup and management capabilities"
+  
+  tags:
+    Environment: "dev"
+    Project: "customer-support-platform"
   # Required: Action group executor
   actionGroupExecutor:
     lambda: {ref: order-lookup}  # Reference to Lambda resource using object syntax

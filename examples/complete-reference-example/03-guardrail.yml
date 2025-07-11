@@ -48,5 +48,6 @@ spec:
   
   tags:
     Environment: "dev"
+    Project: "customer-support-platform"
     Purpose: "content-safety"
     Team: "customer-support"

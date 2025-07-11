@@ -64,6 +64,7 @@ spec:
               - "arn:aws:s3:::company-kb-documents"
   
   tags:
+    Environment: "prod"
+    Project: "customer-support-platform"
     Purpose: "BedrockAgentExecution"
     CreatedBy: "bedrock-forge"
-    Environment: "prod"

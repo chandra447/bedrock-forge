@@ -5,6 +5,12 @@ metadata:
 spec:
   description: "Customer FAQ knowledge base"
   
+  tags:
+    Environment: "dev"
+    Project: "customer-support-platform"
+    DataSource: "S3"
+    ContentType: "FAQ"
+  
   knowledgeBaseConfiguration:
     type: "VECTOR"
     vectorKnowledgeBaseConfiguration:

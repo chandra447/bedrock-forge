@@ -64,6 +64,9 @@ spec:
   
   tags:
     Environment: "dev"
+    Project: "customer-support-platform"
+    DataSource: "S3"
+    ContentType: "documentation"
     Purpose: "knowledge-base"
     Team: "customer-support"
     DataSources: "company-docs,product-manuals"

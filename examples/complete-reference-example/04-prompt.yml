@@ -78,5 +78,6 @@ spec:
   
   tags:
     Environment: "dev"
+    Project: "customer-support-platform"
     Purpose: "orchestration"
     Team: "customer-support"

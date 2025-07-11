@@ -9,6 +9,12 @@ spec:
   description: "Customer support agent for order management"
   idleSessionTtlInSeconds: 3600
   
+  tags:
+    Environment: "dev"
+    Project: "customer-support-platform"
+    AgentType: "customer-service"
+    BusinessFunction: "order-management"
+    
   # Auto-create IAM role with basic permissions (default)
   iamRole:
     autoCreate: true
@@ -36,6 +42,12 @@ spec:
   description: "Customer support agent for order management"
   idleSessionTtlInSeconds: 3600
   
+  tags:
+    Environment: "dev"
+    Project: "customer-support-platform"
+    AgentType: "customer-service"
+    BusinessFunction: "order-management"
+    
   # Reference to manually defined IAM role
   iamRole:
     roleName: "custom-agent-execution-role"
@@ -61,6 +73,12 @@ spec:
   description: "Customer support agent for order management"
   idleSessionTtlInSeconds: 3600
   
+  tags:
+    Environment: "dev"
+    Project: "customer-support-platform"
+    AgentType: "customer-service"
+    BusinessFunction: "order-management"
+    
   # Use existing IAM role ARN
   iamRole:
     roleArn: "arn:aws:iam::123456789012:role/ExistingBedrockAgentRole"

@@ -76,6 +76,9 @@ spec:
   
   tags:
     Environment: "dev"
+    Project: "customer-support-platform"
+    AgentType: "customer-service"
+    BusinessFunction: "order-management"
     Purpose: "customer-support"
     Team: "customer-service"
     Capabilities: "orders,products,knowledge-base"

@@ -8,6 +8,12 @@ spec:
   description: "Customer support agent for order management"
   idleSessionTtlInSeconds: 3600
   
+  tags:
+    Environment: "dev"
+    Project: "customer-support-platform"
+    AgentType: "customer-service"
+    BusinessFunction: "order-management"
+  
   guardrail:
     name: {ref: content-safety-guardrail}
     version: "1"
@@ -35,6 +41,10 @@ metadata:
   description: "Enterprise content safety guardrail"
 spec:
   description: "Enterprise content safety guardrail"
+  
+  tags:
+    Environment: "dev"
+    Project: "customer-support-platform"
   
   contentPolicyConfig:
     filtersConfig:
@@ -94,6 +104,10 @@ metadata:
 spec:
   description: "Enhanced orchestration for customer support agent"
   defaultVariant: "production"
+  
+  tags:
+    Environment: "dev"
+    Project: "customer-support-platform"
   
   variants:
     - name: "production"
