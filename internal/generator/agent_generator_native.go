@@ -229,7 +229,6 @@ func (g *HCLGenerator) generateAgentActionGroups(body *hclwrite.Body, agentName 
 	return nil
 }
 
-
 // generateAgentExecutionRoleNative creates a native AWS IAM role for the agent
 func (g *HCLGenerator) generateAgentExecutionRoleNative(body *hclwrite.Body, agentName string, agent models.AgentSpec) error {
 	roleResourceName := fmt.Sprintf("%s_execution_role", g.sanitizeResourceName(agentName))

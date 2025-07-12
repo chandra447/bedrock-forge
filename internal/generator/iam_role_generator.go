@@ -9,7 +9,6 @@ import (
 	"bedrock-forge/internal/models"
 )
 
-
 // generateIAMRoleModule creates a Terraform module call for an IAM role
 func (g *HCLGenerator) generateIAMRoleModule(body *hclwrite.Body, resource models.BaseResource) error {
 	roleSpec, ok := resource.Spec.(models.IAMRoleSpec)

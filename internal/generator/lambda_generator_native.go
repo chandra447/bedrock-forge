@@ -280,12 +280,12 @@ func (g *HCLGenerator) generateArchiveDataSource(body *hclwrite.Body, resourceNa
 // findAgentsReferencingLambda finds all agents that reference this Lambda function
 func (g *HCLGenerator) findAgentsReferencingLambda(lambdaName string) []string {
 	var referencingAgents []string
-	
+
 	// This would need to be implemented to scan through all registered Agent resources
 	// and check if they reference this Lambda function in their action groups
 	// For now, return empty slice to avoid compile errors
 	// TODO: Implement proper agent scanning logic
-	
+
 	return referencingAgents
 }
 
