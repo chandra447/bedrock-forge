@@ -9,8 +9,10 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy source code and build
-COPY . .
+# Copy only necessary source code directories
+COPY internal/ internal/
+COPY cmd/ cmd/
+COPY pkg/ pkg/
 RUN CGO_ENABLED=0 GOOS=linux go build -o bedrock-forge ./cmd/bedrock-forge
 
 # Create entrypoint script directly in the image and put it in /usr/local/bin
