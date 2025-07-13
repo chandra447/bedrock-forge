@@ -1,18 +1,51 @@
-FROM golang:1.23-alpine AS builder
+FROM golang:1.23-alpine
+
+# Install git and ca-certificates
+RUN apk --no-cache add ca-certificates git
 
 WORKDIR /app
+
+# Copy go mod files and download dependencies
 COPY go.mod go.sum ./
 RUN go mod download
 
+# Copy source code and build
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o bedrock-forge ./cmd/bedrock-forge
 
-FROM alpine:latest
-RUN apk --no-cache add ca-certificates git
-WORKDIR /root/
+# Create entrypoint script directly in the image
+RUN cat > entrypoint.sh << 'EOF'
+#!/bin/sh
+set -e
 
-COPY --from=builder /app/bedrock-forge .
-COPY --from=builder /app/entrypoint.sh .
+# Default values
+COMMAND=${INPUT_COMMAND:-"generate"}
+OUTPUT_DIR=${INPUT_OUTPUT_DIR:-"terraform"}
+CONFIG_PATH=${INPUT_CONFIG_PATH:-"."}
+
+# Build arguments array
+ARGS="$COMMAND"
+
+if [ "$COMMAND" = "generate" ]; then
+    ARGS="$ARGS $CONFIG_PATH $OUTPUT_DIR"
+elif [ "$COMMAND" = "validate" ] || [ "$COMMAND" = "scan" ]; then
+    ARGS="$ARGS $CONFIG_PATH"
+fi
+
+# Add validation config if provided
+if [ -n "$INPUT_VALIDATION_CONFIG" ]; then
+    ARGS="$ARGS --validation-config $INPUT_VALIDATION_CONFIG"
+fi
+
+# Add debug flag if enabled
+if [ "$INPUT_DEBUG" = "true" ]; then
+    ARGS="$ARGS --debug"
+fi
+
+echo "Executing: ./bedrock-forge $ARGS"
+exec ./bedrock-forge $ARGS
+EOF
+
 RUN chmod +x entrypoint.sh
 
 ENTRYPOINT ["./entrypoint.sh"]
