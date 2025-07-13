@@ -12,7 +12,7 @@ RUN apk --no-cache add ca-certificates git
 WORKDIR /root/
 
 COPY --from=builder /app/bedrock-forge .
-COPY entrypoint.sh .
+COPY --from=builder /app/entrypoint.sh .
 RUN chmod +x entrypoint.sh
 
 ENTRYPOINT ["./entrypoint.sh"]
