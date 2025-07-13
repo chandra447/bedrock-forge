@@ -1,6 +1,7 @@
 name: 'Bedrock Forge'
 description: 'Generate Terraform configurations for AWS Bedrock agents and resources'
 author: 'chandra447'
+# Updated: 2025-07-13 - Fixed Docker entrypoint.sh issue
 
 inputs:
   command:
