@@ -14,37 +14,35 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o bedrock-forge ./cmd/bedrock-forge
 
 # Create entrypoint script directly in the image
-RUN cat > entrypoint.sh << 'EOF'
-#!/bin/sh
-set -e
-
-# Default values
-COMMAND=${INPUT_COMMAND:-"generate"}
-OUTPUT_DIR=${INPUT_OUTPUT_DIR:-"terraform"}
-CONFIG_PATH=${INPUT_CONFIG_PATH:-"."}
-
-# Build arguments array
-ARGS="$COMMAND"
-
-if [ "$COMMAND" = "generate" ]; then
-    ARGS="$ARGS $CONFIG_PATH $OUTPUT_DIR"
-elif [ "$COMMAND" = "validate" ] || [ "$COMMAND" = "scan" ]; then
-    ARGS="$ARGS $CONFIG_PATH"
-fi
-
-# Add validation config if provided
-if [ -n "$INPUT_VALIDATION_CONFIG" ]; then
-    ARGS="$ARGS --validation-config $INPUT_VALIDATION_CONFIG"
-fi
-
-# Add debug flag if enabled
-if [ "$INPUT_DEBUG" = "true" ]; then
-    ARGS="$ARGS --debug"
-fi
-
-echo "Executing: ./bedrock-forge $ARGS"
-exec ./bedrock-forge $ARGS
-EOF
+RUN printf '#!/bin/sh\n\
+set -e\n\
+\n\
+# Default values\n\
+COMMAND=${INPUT_COMMAND:-"generate"}\n\
+OUTPUT_DIR=${INPUT_OUTPUT_DIR:-"terraform"}\n\
+CONFIG_PATH=${INPUT_CONFIG_PATH:-"."}\n\
+\n\
+# Build arguments array\n\
+ARGS="$COMMAND"\n\
+\n\
+if [ "$COMMAND" = "generate" ]; then\n\
+    ARGS="$ARGS $CONFIG_PATH $OUTPUT_DIR"\n\
+elif [ "$COMMAND" = "validate" ] || [ "$COMMAND" = "scan" ]; then\n\
+    ARGS="$ARGS $CONFIG_PATH"\n\
+fi\n\
+\n\
+# Add validation config if provided\n\
+if [ -n "$INPUT_VALIDATION_CONFIG" ]; then\n\
+    ARGS="$ARGS --validation-config $INPUT_VALIDATION_CONFIG"\n\
+fi\n\
+\n\
+# Add debug flag if enabled\n\
+if [ "$INPUT_DEBUG" = "true" ]; then\n\
+    ARGS="$ARGS --debug"\n\
+fi\n\
+\n\
+echo "Executing: ./bedrock-forge $ARGS"\n\
+exec ./bedrock-forge $ARGS\n' > entrypoint.sh
 
 RUN chmod +x entrypoint.sh
 
