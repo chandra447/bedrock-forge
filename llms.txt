@@ -805,9 +805,113 @@ spec:
 
 ## GitHub Actions CI/CD Workflows
 
-### Validation Workflow (bedrock-forge-validate.yml)
+Bedrock Forge can be used as a GitHub Action in your CI/CD pipelines. There are two approaches:
 
-**Purpose:** Validate YAML configurations and generate Terraform plans for pull requests
+### Approach 1: Direct Workflow (Recommended for Simple Projects)
+
+**Purpose:** Direct deployment workflow using bedrock-forge GitHub Action
+
+```yaml
+# .github/workflows/deploy-bedrock.yml
+name: Deploy Bedrock Agents
+
+on:
+  push:
+    branches: [main]
+    paths: ['**/*.yml', '**/*.yaml']
+
+jobs:
+  deploy-dev:
+    name: Deploy to Development
+    runs-on: ubuntu-latest
+    environment: development
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_DEPLOYMENT_ROLE }}
+        aws-region: us-east-1
+    
+    - name: Generate Terraform
+      uses: chandra447/bedrock-forge@main
+      with:
+        command: 'generate'
+        output-dir: 'outputs_tf'
+        
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.5.0"
+        
+    - name: Terraform Init
+      run: |
+        cd outputs_tf
+        terraform init \
+          -backend-config="bucket=${{ secrets.TERRAFORM_STATE_BUCKET }}" \
+          -backend-config="key=project-name/dev/terraform.tfstate" \
+          -backend-config="region=us-east-1"
+          
+    - name: Terraform Plan
+      run: |
+        cd outputs_tf
+        terraform plan -out=tfplan
+        
+    - name: Terraform Apply
+      run: |
+        cd outputs_tf
+        terraform apply tfplan
+        
+  deploy-prod:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    environment: production
+    needs: deploy-dev
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_DEPLOYMENT_ROLE }}
+        aws-region: us-east-1
+    
+    - name: Generate Terraform
+      uses: chandra447/bedrock-forge@main
+      with:
+        command: 'generate'
+        output-dir: 'outputs_tf'
+        
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.5.0"
+        
+    - name: Terraform Init
+      run: |
+        cd outputs_tf
+        terraform init \
+          -backend-config="bucket=${{ secrets.TERRAFORM_STATE_BUCKET }}" \
+          -backend-config="key=project-name/prod/terraform.tfstate" \
+          -backend-config="region=us-east-1"
+          
+    - name: Terraform Plan
+      run: |
+        cd outputs_tf
+        terraform plan -out=tfplan
+        
+    - name: Terraform Apply
+      run: |
+        cd outputs_tf
+        terraform apply tfplan
+```
+
+**Optional Validation Workflow for Pull Requests:**
 
 ```yaml
 # .github/workflows/validate-bedrock.yml
@@ -820,20 +924,50 @@ on:
 
 jobs:
   validate:
-    uses: your-org/bedrock-forge/.github/workflows/bedrock-forge-validate.yml@main
-    secrets: inherit
+    name: Validate Configuration
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_DEPLOYMENT_ROLE }}
+        aws-region: us-east-1
+    
+    - name: Validate YAML
+      uses: chandra447/bedrock-forge@main
+      with:
+        command: 'validate'
+        
+    - name: Generate Terraform (for validation)
+      uses: chandra447/bedrock-forge@main
+      with:
+        command: 'generate'
+        output-dir: 'outputs_tf'
+        
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "1.5.0"
+        
+    - name: Terraform Format Check
+      run: |
+        cd outputs_tf
+        terraform fmt -check
+        
+    - name: Terraform Validate
+      run: |
+        cd outputs_tf
+        terraform init -backend=false
+        terraform validate
 ```
 
-**Features:**
-- YAML validation and resource scanning
-- Terraform generation and planning
-- S3 storage of generated modules with commit hash
-- PR comments with plan results and artifact links
-- Read-only validation (no deployments)
+### Approach 2: Reusable Workflows (For Enterprise/Complex Projects)
 
-### Deployment Workflow (bedrock-forge-deploy.yml)
-
-**Purpose:** Deploy pre-validated Terraform configurations to environments
+**Purpose:** Centralized reusable workflows for multiple projects
 
 ```yaml
 # .github/workflows/deploy-bedrock.yml
@@ -854,28 +988,31 @@ jobs:
     secrets: inherit
 ```
 
-**Features:**
-- Downloads pre-validated Terraform from S3
-- Environment-specific deployments with approval
-- State management with S3 backend
-- Deployment summaries with resource outputs
+**Note:** This approach requires you to create reusable workflow files in a central repository.
 
-**Required Secrets:**
+### GitHub Action Inputs
+
+The `chandra447/bedrock-forge` action supports these inputs:
+
+- **command** (required): Command to run (`generate`, `validate`, `scan`)
+- **output-dir** (optional): Output directory for generated files (default: `terraform`)
+- **config-path** (optional): Path to configuration files (default: `.`)
+- **validation-config** (optional): Path to validation configuration file
+- **debug** (optional): Enable debug mode (default: `false`)
+
+### Required Secrets
+
 ```
-AWS_VALIDATION_ROLE=arn:aws:iam::account:role/validation-role
-AWS_DEPLOYMENT_ROLE=arn:aws:iam::account:role/deployment-role
-TERRAFORM_ARTIFACTS_BUCKET=your-terraform-artifacts-bucket
+AWS_DEPLOYMENT_ROLE=arn:aws:iam::123456789012:role/GitHubActionsDeploymentRole
 TERRAFORM_STATE_BUCKET=your-terraform-state-bucket
 ```
 
-**S3 Storage Structure:**
-```
-s3://terraform-artifacts-bucket/
-├── generated-modules/abc123def456/  # Commit hash
-│   ├── main.tf, variables.tf, outputs.tf
-├── terraform-plans/abc123def456/
-│   ├── plan.txt, plan-detailed.txt
-```
+### Environment Configuration
+
+Set up GitHub Environments (development, production) with:
+- Protection rules requiring manual approval for production
+- Environment-specific secrets if needed
+- Deployment branch restrictions
 
 ## Common Patterns and Examples
 
