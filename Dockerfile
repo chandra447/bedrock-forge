@@ -13,7 +13,7 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o bedrock-forge ./cmd/bedrock-forge
 
-# Create entrypoint script directly in the image
+# Create entrypoint script directly in the image and put it in /usr/local/bin
 RUN printf '#!/bin/sh\n\
 set -e\n\
 \n\
@@ -41,9 +41,9 @@ if [ "$INPUT_DEBUG" = "true" ]; then\n\
     ARGS="$ARGS --debug"\n\
 fi\n\
 \n\
-echo "Executing: ./bedrock-forge $ARGS"\n\
-exec ./bedrock-forge $ARGS\n' > entrypoint.sh
+echo "Executing: /app/bedrock-forge $ARGS"\n\
+exec /app/bedrock-forge $ARGS\n' > /usr/local/bin/entrypoint.sh
 
-RUN chmod +x entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
-ENTRYPOINT ["./entrypoint.sh"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
