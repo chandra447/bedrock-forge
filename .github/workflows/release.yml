@@ -6,7 +6,11 @@ on:
   workflow_dispatch:
 
 env:
-  GO_VERSION: '1.21'
+  GO_VERSION: '1.23'
+
+permissions:
+  contents: write
+  pull-requests: write
 
 jobs:
   release-please:
@@ -114,106 +118,6 @@ jobs:
           asset_name: ${{ env.ASSET_NAME }}
           asset_content_type: application/octet-stream
 
-  publish-github-action:
-    name: Publish GitHub Action
-    runs-on: ubuntu-latest
-    needs: release-please
-    if: needs.release-please.outputs.release_created == 'true'
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.release-please.outputs.sha }}
-
-      - name: Create action.yml for GitHub Action
-        run: |
-          cat > action.yml << 'EOF'
-          name: 'Bedrock Forge Deploy'
-          description: 'Deploy AWS Bedrock agents using Bedrock Forge'
-          branding:
-            icon: 'cloud'
-            color: 'orange'
-          
-          inputs:
-            validation_only:
-              description: 'Run validation only (no deployment)'
-              required: false
-              default: 'true'
-            environment:
-              description: 'Environment to deploy (dev, staging, prod)'
-              required: false
-              default: 'dev'
-            aws_region:
-              description: 'AWS Region for deployment'
-              required: false
-              default: 'us-east-1'
-            aws_role:
-              description: 'AWS IAM Role ARN to assume for deployment'
-              required: false
-            aws_session_name:
-              description: 'AWS session name for the assumed role'
-              required: false
-              default: 'bedrock-forge-deploy'
-            terraform_version:
-              description: 'Terraform version to use'
-              required: false
-              default: '1.5.0'
-            go_version:
-              description: 'Go version to use for building Bedrock Forge'
-              required: false
-              default: '1.21'
-            bedrock_forge_version:
-              description: 'Bedrock Forge version/ref to use'
-              required: false
-              default: '${{ needs.release-please.outputs.tag_name }}'
-            source_path:
-              description: 'Path to YAML configurations in the repository'
-              required: false
-              default: '.'
-            tf_state_bucket:
-              description: 'S3 bucket for Terraform state'
-              required: false
-            tf_state_key_prefix:
-              description: 'Key prefix for Terraform state in S3'
-              required: false
-              default: 'bedrock-forge'
-            tf_state_lock_table:
-              description: 'DynamoDB table for Terraform state locking'
-              required: false
-            dry_run:
-              description: 'Run in dry-run mode (plan only, no apply)'
-              required: false
-              default: 'false'
-          
-          runs:
-            using: 'composite'
-            steps:
-              - name: Deploy with Bedrock Forge
-                uses: ./.github/workflows/bedrock-forge-deploy.yml
-                with:
-                  validation_only: ${{ inputs.validation_only }}
-                  environment: ${{ inputs.environment }}
-                  aws_region: ${{ inputs.aws_region }}
-                  aws_role: ${{ inputs.aws_role }}
-                  aws_session_name: ${{ inputs.aws_session_name }}
-                  terraform_version: ${{ inputs.terraform_version }}
-                  go_version: ${{ inputs.go_version }}
-                  bedrock_forge_version: ${{ inputs.bedrock_forge_version }}
-                  source_path: ${{ inputs.source_path }}
-                  tf_state_bucket: ${{ inputs.tf_state_bucket }}
-                  tf_state_key_prefix: ${{ inputs.tf_state_key_prefix }}
-                  tf_state_lock_table: ${{ inputs.tf_state_lock_table }}
-                  dry_run: ${{ inputs.dry_run }}
-          EOF
-
-      - name: Commit and push action.yml
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add action.yml
-          git commit -m "feat: add GitHub Action definition for ${{ needs.release-please.outputs.tag_name }}" || exit 0
-          git push
 
   update-homebrew:
     name: Update Homebrew Formula
@@ -234,7 +138,7 @@ jobs:
   notify-release:
     name: Notify Release
     runs-on: ubuntu-latest
-    needs: [release-please, build-and-upload, publish-github-action]
+    needs: [release-please, build-and-upload]
     if: needs.release-please.outputs.release_created == 'true'
     
     steps:
@@ -246,7 +150,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Go Install (Recommended):**" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
-          echo "go install github.com/your-org/bedrock-forge/cmd/bedrock-forge@${{ needs.release-please.outputs.tag_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "go install github.com/chandra447/bedrock-forge/cmd/bedrock-forge@${{ needs.release-please.outputs.tag_name }}" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Download Binaries:**" >> $GITHUB_STEP_SUMMARY
@@ -258,7 +162,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🔄 GitHub Action" >> $GITHUB_STEP_SUMMARY
           echo '```yaml' >> $GITHUB_STEP_SUMMARY
-          echo "- uses: your-org/bedrock-forge@${{ needs.release-please.outputs.tag_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- uses: chandra447/bedrock-forge@${{ needs.release-please.outputs.tag_name }}" >> $GITHUB_STEP_SUMMARY
           echo "  with:" >> $GITHUB_STEP_SUMMARY
           echo "    aws_role: \${{ vars.AWS_DEPLOYMENT_ROLE }}" >> $GITHUB_STEP_SUMMARY
           echo "    tf_state_bucket: \${{ vars.TF_STATE_BUCKET }}" >> $GITHUB_STEP_SUMMARY
