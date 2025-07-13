@@ -61,7 +61,7 @@ jobs:
       - name: Checkout Bedrock Forge
         uses: actions/checkout@v4
         with:
-          repository: 'your-org/bedrock-forge'
+          repository: 'chandra447/bedrock-forge'
           ref: 'main'
           path: .bedrock-forge
 

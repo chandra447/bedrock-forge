@@ -95,7 +95,7 @@ Create a deployment role with the following trust policy:
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
         },
         "StringLike": {
-          "token.actions.githubusercontent.com:sub": "repo:your-org/your-repo:*"
+          "token.actions.githubusercontent.com:sub": "repo:chandra447/bedrock-forge:*"
         }
       }
     }
@@ -202,7 +202,7 @@ Override default module sources in `forge.yml`:
 
 ```yaml
 modules:
-  registry: "git::https://github.com/your-org/bedrock-terraform-modules"
+  registry: "git::https://github.com/chandra447/bedrock-terraform-modules"
   version: "v2.0.0"
 ```
 
