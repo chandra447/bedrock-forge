@@ -1,0 +1,38 @@
+name: 'Bedrock Forge'
+description: 'Generate Terraform configurations for AWS Bedrock agents and resources'
+author: 'chandra447'
+
+inputs:
+  command:
+    description: 'Command to run (generate, validate, scan)'
+    required: true
+    default: 'generate'
+  output-dir:
+    description: 'Output directory for generated files'
+    required: false
+    default: 'terraform'
+  config-path:
+    description: 'Path to configuration files'
+    required: false
+    default: '.'
+  validation-config:
+    description: 'Path to validation configuration file'
+    required: false
+  debug:
+    description: 'Enable debug mode'
+    required: false
+    default: 'false'
+
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  env:
+    INPUT_COMMAND: ${{ inputs.command }}
+    INPUT_OUTPUT_DIR: ${{ inputs.output-dir }}
+    INPUT_CONFIG_PATH: ${{ inputs.config-path }}
+    INPUT_VALIDATION_CONFIG: ${{ inputs.validation-config }}
+    INPUT_DEBUG: ${{ inputs.debug }}
+
+branding:
+  icon: 'settings'
+  color: 'orange'
